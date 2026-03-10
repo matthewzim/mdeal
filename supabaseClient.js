@@ -80,39 +80,41 @@ const SupabaseClient = (() => {
     if (!token) {
       throw new Error('Not authenticated. Please refresh and try again.');
     }
-    let data, error;
+
+    // Use fetch directly instead of supabase.functions.invoke() so we have
+    // full control over response parsing and can surface real error messages
+    // instead of the generic "Edge Function returned a non-2xx status code".
+    const url = SUPABASE_URL + '/functions/v1/' + name;
+    let res;
     try {
-      ({ data, error } = await supabase.functions.invoke(name, {
-        body,
+      res = await fetch(url, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+          'apikey': SUPABASE_ANON_KEY,
         },
-      }));
+        body: JSON.stringify(body),
+      });
     } catch (fetchErr) {
       throw new Error(
         'Could not reach the Edge Function "' + name + '". ' +
         'Make sure the function is deployed (supabase functions deploy ' + name + ').'
       );
     }
-    if (error) {
-      // FunctionsFetchError — network-level failure (CORS, DNS, not deployed, etc.)
-      if (error.name === 'FunctionsFetchError') {
-        throw new Error(
-          'Could not reach the Edge Function "' + name + '". ' +
-          'Make sure the function is deployed (supabase functions deploy ' + name + ').'
-        );
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (!res.ok) {
+        throw new Error('Edge Function "' + name + '" returned status ' + res.status);
       }
-      // Try to extract the error message from the response body
-      if (error.context?.body) {
-        try {
-          const text = await error.context.text?.() || error.message;
-          const parsed = JSON.parse(text);
-          throw new Error(parsed.error || error.message);
-        } catch (e) {
-          if (e.message !== error.message) throw e;
-        }
-      }
-      throw error;
+      return null;
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || 'Edge Function "' + name + '" returned status ' + res.status);
     }
     if (data?.error) throw new Error(data.error);
     return data;
