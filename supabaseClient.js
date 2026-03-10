@@ -77,14 +77,32 @@ const SupabaseClient = (() => {
 
   async function callFunction(name, body) {
     const token = await getToken();
-    const { data, error } = await supabase.functions.invoke(name, {
-      body,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    if (!token) {
+      throw new Error('Not authenticated. Please refresh and try again.');
+    }
+    let data, error;
+    try {
+      ({ data, error } = await supabase.functions.invoke(name, {
+        body,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }));
+    } catch (fetchErr) {
+      throw new Error(
+        'Could not reach the Edge Function "' + name + '". ' +
+        'Make sure the function is deployed (supabase functions deploy ' + name + ').'
+      );
+    }
     if (error) {
-      // Try to extract the error message from the response
+      // FunctionsFetchError — network-level failure (CORS, DNS, not deployed, etc.)
+      if (error.name === 'FunctionsFetchError') {
+        throw new Error(
+          'Could not reach the Edge Function "' + name + '". ' +
+          'Make sure the function is deployed (supabase functions deploy ' + name + ').'
+        );
+      }
+      // Try to extract the error message from the response body
       if (error.context?.body) {
         try {
           const text = await error.context.text?.() || error.message;
