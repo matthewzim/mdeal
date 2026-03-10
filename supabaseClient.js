@@ -25,10 +25,35 @@ const SupabaseClient = (() => {
   // ── Auth ──────────────────────────────────────────────────────────────
 
   async function signInAnonymously() {
+    // Try anonymous sign-in first
     const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) throw error;
-    currentUser = data.user;
-    return data;
+    if (!error) {
+      currentUser = data.user;
+      return data;
+    }
+
+    // If anonymous sign-ins are disabled, fall back to auto-generated account
+    const storedId = localStorage.getItem('mdeal_auto_user_id');
+    if (storedId) {
+      // Try to sign in with existing auto-generated credentials
+      const email = `${storedId}@mdeal.local`;
+      const password = storedId;
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (!signInError) {
+        currentUser = signInData.user;
+        return signInData;
+      }
+    }
+
+    // Create a new auto-generated account
+    const userId = crypto.randomUUID();
+    const email = `${userId}@mdeal.local`;
+    const password = userId;
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+    if (signUpError) throw signUpError;
+    localStorage.setItem('mdeal_auto_user_id', userId);
+    currentUser = signUpData.user;
+    return signUpData;
   }
 
   async function getSession() {
