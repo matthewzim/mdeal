@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monopoly Deal Online</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Config Bar ──────────────────────────────────────────────── -->
+  <div class="config-bar">
+    <button onclick="document.getElementById('config-modal').classList.add('active')">Settings</button>
+  </div>
+
+  <!-- ── Config Modal ────────────────────────────────────────────── -->
+  <div id="config-modal">
+    <div class="config-box">
+      <h3>Supabase Configuration</h3>
+      <p style="font-size:0.8rem; opacity:0.7; margin-bottom:16px;">
+        Enter your Supabase project credentials. These are saved in localStorage.
+      </p>
+      <div class="input-group">
+        <label>Supabase URL</label>
+        <input type="text" id="config-url" placeholder="https://xxxxx.supabase.co">
+      </div>
+      <div class="input-group">
+        <label>Supabase Anon Key</label>
+        <input type="text" id="config-key" placeholder="eyJhbGciOiJIUzI1NiIs...">
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()">Save & Connect</button>
+      <button class="btn btn-cancel" style="margin-top:8px" onclick="document.getElementById('config-modal').classList.remove('active')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Loading Overlay ─────────────────────────────────────────── -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ── Action Overlay ──────────────────────────────────────────── -->
+  <div id="action-overlay"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- LOGIN SCREEN                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <h1>MONOPOLY DEAL</h1>
+      <h2>Online Multiplayer Card Game</h2>
+
+      <div class="input-group">
+        <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">
+      </div>
+
+      <button class="btn btn-create" id="btn-create-room" style="width:100%">Create Room</button>
+
+      <div class="separator">— or join an existing room —</div>
+
+      <div class="input-group">
+        <input type="text" id="input-room-code" placeholder="Room Code (e.g. ABCDEF)" maxlength="6" style="text-transform:uppercase; letter-spacing:4px; text-align:center" autocomplete="off">
+      </div>
+
+      <button class="btn btn-join" id="btn-join-room" style="width:100%">Join Room</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- LOBBY SCREEN                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div id="lobby-screen" class="screen">
+    <div class="lobby-box">
+      <h2>Game Lobby</h2>
+      <div class="room-code-display" id="lobby-room-code">------</div>
+      <div class="room-code-hint">Click to copy room code. Share it with friends!</div>
+
+      <div id="lobby-player-list"></div>
+
+      <div class="lobby-buttons">
+        <button class="btn btn-ready" id="btn-ready">Toggle Ready</button>
+        <button class="btn btn-primary" id="btn-start-game" style="display:none" disabled>
+          Waiting for players...
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- GAME SCREEN                                                   -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div id="game-screen" class="screen">
+    <div class="game-table">
+      <!-- Opponent seats -->
+      <div class="opponent-seat" id="opponent-top-left"></div>
+      <div class="opponent-seat" id="opponent-top"></div>
+      <div class="opponent-seat" id="opponent-right"></div>
+      <div class="opponent-seat" id="opponent-left"></div>
+
+      <!-- Center play area -->
+      <div class="center-area">
+        <div id="my-properties"></div>
+        <div id="my-bank"></div>
+      </div>
+
+      <!-- Game info & log -->
+      <div class="game-info-panel">
+        <div id="game-info"></div>
+        <div id="game-log"></div>
+      </div>
+
+      <!-- Player hand -->
+      <div class="hand-area">
+        <div id="action-bar"></div>
+        <div id="my-hand"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- SCRIPTS                                                       -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Supabase JS Client (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- Game modules -->
+  <script src="supabaseClient.js"></script>
+  <script src="clientGame.js"></script>
+  <script src="ui.js"></script>
+
+  <!-- Init -->
+  <script>
+    // Load config from localStorage
+    function loadConfig() {
+      const url = localStorage.getItem('supabase_url');
+      const key = localStorage.getItem('supabase_anon_key');
+      if (url) document.getElementById('config-url').value = url;
+      if (key) document.getElementById('config-key').value = key;
+      return { url, key };
+    }
+
+    function saveConfig() {
+      const url = document.getElementById('config-url').value.trim();
+      const key = document.getElementById('config-key').value.trim();
+      if (!url || !key) {
+        UI.showError('Both URL and Key are required');
+        return;
+      }
+      localStorage.setItem('supabase_url', url);
+      localStorage.setItem('supabase_anon_key', key);
+      document.getElementById('config-modal').classList.remove('active');
+      initApp(url, key);
+    }
+
+    async function initApp(url, key) {
+      try {
+        SupabaseClient.init(url, key);
+
+        // Try to restore session
+        let session = await SupabaseClient.getSession();
+        if (!session) {
+          // Sign in anonymously
+          await SupabaseClient.signInAnonymously();
+        }
+
+        UI.init();
+        UI.showToast('Connected to Supabase!');
+      } catch (err) {
+        UI.showError('Connection failed: ' + err.message);
+        console.error(err);
+      }
+    }
+
+    // Boot
+    const { url, key } = loadConfig();
+    if (url && key) {
+      initApp(url, key);
+    } else {
+      // Show config modal on first load
+      document.getElementById('config-modal').classList.add('active');
+      UI.init();
+    }
+  </script>
+
+</body>
+</html>
