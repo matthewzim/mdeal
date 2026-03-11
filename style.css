@@ -505,10 +505,13 @@ html, body {
 
 .opponent-card-area {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  gap: 6px;
+  align-items: flex-start;
+  overflow: auto;
 }
 
 /* Left opponent: rotate card area 90° clockwise (cards face right) */
@@ -558,17 +561,22 @@ html, body {
 
 .opponent-properties {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
 .prop-group {
-  margin-bottom: 6px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
 }
 
 .prop-group .card-image-tiny {
-  margin-right: 2px;
-  margin-bottom: 2px;
+  margin-right: 0;
+  margin-bottom: 0;
 }
 
 .prop-group-label {
@@ -956,6 +964,13 @@ html, body {
   object-fit: cover;
   display: block;
   border-radius: inherit;
+}
+
+.card-image-tiny.has-card-img,
+.card-image-mini.has-card-img {
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* Card back */

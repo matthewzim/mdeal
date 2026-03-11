@@ -253,7 +253,10 @@ const UI = (() => {
             ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
           </div>
           <div class="opponent-bank">
-            ${opp.bank.map(c => `<div class="card-image-tiny">${buildCardImageHtml(c)}</div>`).join('')}
+            ${opp.bank.map(c => {
+              const hasImg = getCardImagePath(c) ? ' has-card-img' : '';
+              return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
+            }).join('')}
           </div>
           <div class="opponent-properties">${propsHtml}</div>
         </div>
@@ -351,6 +354,7 @@ const UI = (() => {
     for (const card of player.bank) {
       const el = document.createElement('div');
       el.className = 'card-image-mini bank-card-img';
+      if (getCardImagePath(card)) el.classList.add('has-card-img');
       el.dataset.cardId = card.id;
       el.innerHTML = buildCardImageHtml(card);
       container.appendChild(el);
@@ -574,13 +578,15 @@ const UI = (() => {
     `;
 
     for (const card of myPlayer.bank) {
-      html += `<div class="card-image-mini selectable" data-card-id="${card.id}" data-value="${card.value}" data-source="bank" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
+      const hasImg = getCardImagePath(card) ? ' has-card-img' : '';
+      html += `<div class="card-image-mini selectable${hasImg}" data-card-id="${card.id}" data-value="${card.value}" data-source="bank" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
     }
 
     html += `</div></div><div class="payment-section"><h4>Properties</h4><div class="payment-cards" id="payment-props">`;
 
     for (const card of myPlayer.properties) {
-      html += `<div class="card-image-mini selectable" data-card-id="${card.id}" data-value="${card.value}" data-source="property" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
+      const hasImg = getCardImagePath(card) ? ' has-card-img' : '';
+      html += `<div class="card-image-mini selectable${hasImg}" data-card-id="${card.id}" data-value="${card.value}" data-source="property" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
     }
 
     html += `
@@ -1031,13 +1037,15 @@ const UI = (() => {
   function createPropertyCardElement(card) {
     const el = document.createElement('div');
     el.className = 'card-image-mini';
+    if (getCardImagePath(card)) el.classList.add('has-card-img');
     el.dataset.cardId = card.id;
     el.innerHTML = buildCardImageHtml(card);
     return el;
   }
 
   function createMiniPropertyCard(card) {
-    return `<div class="card-image-tiny">${buildCardImageHtml(card)}</div>`;
+    const hasImg = getCardImagePath(card) ? ' has-card-img' : '';
+    return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(card)}</div>`;
   }
 
   function buildCardImageHtml(card) {
