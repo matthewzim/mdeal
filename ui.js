@@ -248,13 +248,15 @@ const UI = (() => {
           </div>
           ${state.currentPlayer === opp.id ? '<div class="turn-indicator">TURN</div>' : ''}
         </div>
-        <div class="opponent-cards">
-          ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
+        <div class="opponent-card-area">
+          <div class="opponent-cards">
+            ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
+          </div>
+          <div class="opponent-bank">
+            ${opp.bank.map(c => `<div class="card-image-tiny">${buildCardImageHtml(c)}</div>`).join('')}
+          </div>
+          <div class="opponent-properties">${propsHtml}</div>
         </div>
-        <div class="opponent-bank">
-          ${opp.bank.map(c => `<div class="card-image-tiny">${buildCardImageHtml(c)}</div>`).join('')}
-        </div>
-        <div class="opponent-properties">${propsHtml}</div>
       `;
     });
   }
