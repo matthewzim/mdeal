@@ -30,6 +30,7 @@ const UI = (() => {
   let lastRenderedHandIds = null; // track hand card IDs to avoid unnecessary re-renders
   let playedCardFadeTimeout = null; // track showPlayedCard timeouts to avoid overlap
   let playedCardCleanTimeout = null;
+  let lastActionCard = null; // track the last action card played (for center display)
 
   // ── Screen management ────────────────────────────────────────────────
 
@@ -188,6 +189,9 @@ const UI = (() => {
 
     // Render game log
     renderGameLog(state.log, names);
+
+    // Render deck and last action card in center
+    renderDeckAndDiscard(state);
 
     // Render action bar (draw / end turn / etc)
     renderActionBar(state, myId);
@@ -441,6 +445,52 @@ const UI = (() => {
       case 'move_wild': return `${n(entry.player)} moved ${entry.card} to ${COLOR_LABELS[entry.color] || entry.color}`;
       default: return JSON.stringify(entry);
     }
+  }
+
+  // ── Deck & Last Action Card (center area) ───────────────────────────
+
+  function renderDeckAndDiscard(state) {
+    const container = document.getElementById('deck-and-discard');
+    if (!container || !state) return;
+
+    const deckCount = typeof state.deck === 'number' ? state.deck : (state.deck?.length || 0);
+    let html = '';
+
+    // Last action card (slightly to the left)
+    html += '<div class="last-action-card-slot">';
+    html += '<div class="slot-label">Last Action</div>';
+    if (lastActionCard) {
+      const cardEl = createCardElement(lastActionCard, false);
+      // We need to build HTML string, so use innerHTML approach
+      const imgPath = getCardImagePath(lastActionCard);
+      if (imgPath) {
+        html += `<div class="card card-has-image"><img class="card-img" src="${imgPath}" alt="${escapeHtml(lastActionCard.name)}" draggable="false"></div>`;
+      } else {
+        let actionColor = '#e67e22';
+        if (lastActionCard.actionType === 'just_say_no') actionColor = '#e74c3c';
+        if (lastActionCard.actionType === 'rent' || lastActionCard.actionType === 'multi_rent') actionColor = '#3498db';
+        if (lastActionCard.actionType === 'deal_breaker') actionColor = '#9b59b6';
+        html += `<div class="card card-action">
+          <div class="card-color-bar" style="background:${actionColor}"></div>
+          <div class="card-name">${escapeHtml(lastActionCard.name)}</div>
+          <div class="card-value">${lastActionCard.value}M</div>
+        </div>`;
+      }
+    } else {
+      html += '<div class="last-action-empty">No action played</div>';
+    }
+    html += '</div>';
+
+    // Deck (slightly to the right)
+    if (deckCount > 0) {
+      html += '<div class="deck-card-slot">';
+      html += '<div class="slot-label">Deck</div>';
+      html += `<img class="deck-card-img" src="assets/cards/back-cover.png" alt="Deck" draggable="false">`;
+      html += `<div class="deck-count">${deckCount} cards</div>`;
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
   }
 
   // ── Action bar ───────────────────────────────────────────────────────
@@ -1235,6 +1285,12 @@ const UI = (() => {
 
   function showPlayedCard(card, playerName) {
     const container = document.getElementById('played-card-display');
+
+    // Track last action card played (only action type, not property or money)
+    if (card && card.type === 'action') {
+      lastActionCard = card;
+      renderDeckAndDiscard(ClientGame.getGameState());
+    }
 
     // Cancel any pending timeouts from a previous card display
     if (playedCardFadeTimeout) clearTimeout(playedCardFadeTimeout);
