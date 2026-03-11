@@ -440,12 +440,12 @@ html, body {
 
 #opponent-left {
   grid-area: left;
-  min-height: 500px;
+  max-height: 500px;
 }
 
 #opponent-right {
   grid-area: right;
-  min-height: 500px;
+  max-height: 500px;
 }
 
 #opponent-top-left {
