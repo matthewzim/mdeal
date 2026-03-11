@@ -175,6 +175,7 @@
     }
 
     async function initApp(url, key) {
+      UI.init();
       try {
         SupabaseClient.init(url, key);
 
@@ -185,7 +186,6 @@
           await SupabaseClient.signInAnonymously();
         }
 
-        UI.init();
         UI.showToast('Connected to Supabase!');
       } catch (err) {
         UI.showError('Connection failed: ' + err.message);

@@ -1020,7 +1020,10 @@ const UI = (() => {
 
   // ── Init ─────────────────────────────────────────────────────────────
 
+  let initialized = false;
   function init() {
+    if (initialized) return;
+    initialized = true;
     initLoginHandlers();
     initLobbyHandlers();
   }
