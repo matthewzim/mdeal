@@ -412,7 +412,7 @@ html, body {
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "top-left  top       top        game-info"
-    "left      center    right      ."
+    "left      center    right      game-info"
     "hand      hand      hand       hand";
   gap: 8px;
   padding: 8px;
@@ -568,6 +568,18 @@ html, body {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+#opponent-left .opponent-properties,
+#opponent-right .opponent-properties {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+#opponent-left .prop-group,
+#opponent-right .prop-group {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .prop-group {
@@ -791,6 +803,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 #game-info {
@@ -821,7 +835,7 @@ html, body {
   padding: 10px;
   flex: 1;
   overflow-y: auto;
-  max-height: 300px;
+  min-height: 0;
 }
 
 .log-entry {
