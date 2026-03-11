@@ -298,3 +298,9 @@ if (typeof module !== 'undefined' && module.exports) {
     buildFullDeck, shuffleDeck, resetCardIds,
   };
 }
+if (typeof window !== 'undefined') {
+  window.MonopolyDeck = {
+    COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
+    buildFullDeck, shuffleDeck, resetCardIds,
+  };
+}

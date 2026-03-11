@@ -322,3 +322,6 @@ const Rules = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { Rules };
 }
+if (typeof window !== 'undefined') {
+  window.MonopolyRules = Rules;
+}
