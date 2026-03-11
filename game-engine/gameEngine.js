@@ -1,6 +1,10 @@
 // Monopoly Deal - Game Engine
 // Mutates game state based on validated actions
 
+// Wrap in IIFE to avoid redeclaring const variables from deck.js in the
+// global scope (which would cause a SyntaxError in the browser).
+;(function () {
+
 const {
   COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
   buildFullDeck, shuffleDeck,
@@ -550,4 +554,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 if (typeof window !== 'undefined') {
   window.MonopolyGameEngine = GameEngine;
+  window.GameEngine = GameEngine;
 }
+
+})();

@@ -98,31 +98,60 @@ const SupabaseClient = (() => {
   // ── Edge Function calls ──────────────────────────────────────────────
 
   async function callFunction(name, body) {
-    const token = await getToken();
+    // Use fetch directly instead of supabase.functions.invoke() so we have
+    // full control over response parsing and can surface real error messages
+    // instead of the generic "Edge Function returned a non-2xx status code".
+    async function attempt(authToken) {
+      const url = SUPABASE_URL + '/functions/v1/' + name;
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + authToken,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(body),
+        });
+      } catch (fetchErr) {
+        throw new Error(
+          'Could not reach the Edge Function "' + name + '". ' +
+          'Make sure the function is deployed (supabase functions deploy ' + name + ').'
+        );
+      }
+      return res;
+    }
+
+    let token = await getToken();
     if (!token) {
       throw new Error('Not authenticated. Please refresh and try again.');
     }
 
-    // Use fetch directly instead of supabase.functions.invoke() so we have
-    // full control over response parsing and can surface real error messages
-    // instead of the generic "Edge Function returned a non-2xx status code".
-    const url = SUPABASE_URL + '/functions/v1/' + name;
-    let res;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (fetchErr) {
-      throw new Error(
-        'Could not reach the Edge Function "' + name + '". ' +
-        'Make sure the function is deployed (supabase functions deploy ' + name + ').'
-      );
+    let res = await attempt(token);
+
+    // If we get a 401 (e.g. "Invalid JWT" from the API gateway due to an
+    // expired or stale cached token), force a session refresh and retry once.
+    if (res.status === 401) {
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      if (refreshed?.access_token) {
+        token = refreshed.access_token;
+      } else {
+        // Refresh failed — re-authenticate from scratch
+        try {
+          await signInAnonymously();
+          const { data: { session: newSession } } = await supabase.auth.getSession();
+          token = newSession?.access_token || null;
+        } catch (_e) {
+          token = null;
+        }
+      }
+
+      if (!token) {
+        throw new Error('Not authenticated. Please refresh and try again.');
+      }
+
+      res = await attempt(token);
     }
 
     let data;
