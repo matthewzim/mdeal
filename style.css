@@ -411,9 +411,9 @@ html, body {
   grid-template-columns: 260px 1fr 260px 260px;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
-    "top-left  top       top        game-info"
+    "top-left  top       .          game-info"
     "left      center    right      game-info"
-    "hand      hand      hand       hand";
+    "hand      hand      hand       game-info";
   gap: 8px;
   padding: 8px;
   min-height: 100%;
