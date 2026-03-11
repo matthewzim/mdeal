@@ -27,6 +27,7 @@ const UI = (() => {
   let discardNeeded = 0;
   let selectedDiscards = [];
   let actionTargetMode = null; // for targeting actions
+  let lastRenderedHandIds = null; // track hand card IDs to avoid unnecessary re-renders
 
   // ── Screen management ────────────────────────────────────────────────
 
@@ -256,11 +257,23 @@ const UI = (() => {
     });
   }
 
-  function renderMyHand(player, state) {
+  function renderMyHand(player, state, forceRender) {
     const container = document.getElementById('my-hand');
-    container.innerHTML = '';
 
-    if (!player || !player.hand) return;
+    if (!player || !player.hand) {
+      container.innerHTML = '';
+      lastRenderedHandIds = null;
+      return;
+    }
+
+    // Check if the hand cards have actually changed
+    const currentIds = player.hand.filter(c => c.type !== 'hidden').map(c => c.id).join(',');
+    if (!forceRender && lastRenderedHandIds === currentIds && !discardMode) {
+      return; // hand hasn't changed, skip re-render
+    }
+    lastRenderedHandIds = currentIds;
+
+    container.innerHTML = '';
 
     player.hand.forEach((card, i) => {
       if (card.type === 'hidden') return;
@@ -273,7 +286,7 @@ const UI = (() => {
         if (selectedDiscards.includes(card.id)) {
           el.classList.add('selected');
         }
-      } else if (state.currentPlayer === player.id && state.phase === 'play') {
+      } else if (state.currentPlayer === player.id && state.phase === 'play' && state.turnPlaysRemaining > 0) {
         el.addEventListener('click', () => showCardActions(card, state, player));
       }
 
@@ -430,7 +443,7 @@ const UI = (() => {
         const player = state.players.find(p => p.id === myId);
         discardNeeded = player ? player.hand.length - 7 : 0;
         selectedDiscards = [];
-        renderMyHand(player, state);
+        renderMyHand(player, state, true);
       }
       const info = document.createElement('div');
       info.className = 'discard-info';
@@ -717,38 +730,61 @@ const UI = (() => {
     actionTargetMode = null;
   }
 
+  function _getCardFromHand(cardId) {
+    const state = ClientGame.getGameState();
+    if (!state) return null;
+    const myPlayer = state.players.find(p => p.id === ClientGame.getPlayerId());
+    if (!myPlayer) return null;
+    return myPlayer.hand.find(c => c.id === cardId);
+  }
+
+  function _showMyPlayedCard(cardId) {
+    const card = _getCardFromHand(cardId);
+    if (card) {
+      const name = ClientGame.getPlayerNames()[ClientGame.getPlayerId()] || 'You';
+      showPlayedCard(card, name);
+    }
+  }
+
   async function _doBank(cardId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.bankCard(cardId);
   }
 
   async function _doPlayProperty(cardId, chosenColor) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playProperty(cardId, chosenColor);
   }
 
   async function _doPassGo(cardId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playPassGo(cardId);
   }
 
   async function _doRent(cardId, targetColor) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     // TODO: support double rent selection
     await ClientGame.playRent(cardId, targetColor, null);
   }
 
   async function _doDebtCollector(cardId, targetId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playDebtCollector(cardId, targetId);
   }
 
   async function _doBirthday(cardId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playBirthday(cardId);
   }
 
   async function _doSlyDeal(cardId, targetId, targetCardId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playSlyDeal(cardId, targetId, targetCardId);
   }
@@ -770,11 +806,13 @@ const UI = (() => {
   }
 
   async function _doForcedDeal(cardId, targetId, targetCardId, myCardId) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playForcedDeal(cardId, targetId, targetCardId, myCardId);
   }
 
   async function _doDealBreaker(cardId, targetId, targetColor) {
+    _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playDealBreaker(cardId, targetId, targetColor);
   }
@@ -845,7 +883,7 @@ const UI = (() => {
     selectedDiscards = [];
     const state = ClientGame.getGameState();
     const player = state.players.find(p => p.id === ClientGame.getPlayerId());
-    renderMyHand(player, state);
+    renderMyHand(player, state, true);
     renderActionBar(state, ClientGame.getPlayerId());
   }
 
@@ -1009,6 +1047,32 @@ const UI = (() => {
     showToast(`Drew ${cards.length} card(s)`);
   }
 
+  function showPlayedCard(card, playerName) {
+    const container = document.getElementById('played-card-display');
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'played-card-wrapper';
+
+    const cardEl = createCardElement(card, false);
+    wrapper.appendChild(cardEl);
+
+    if (playerName) {
+      const label = document.createElement('div');
+      label.className = 'played-card-label';
+      label.textContent = `${playerName} played`;
+      wrapper.appendChild(label);
+    }
+
+    container.appendChild(wrapper);
+
+    // Start fade-out after a delay, then remove
+    setTimeout(() => {
+      wrapper.classList.add('fade-out');
+      setTimeout(() => { container.innerHTML = ''; }, 500);
+    }, 1200);
+  }
+
   function showWinner(winnerId, names) {
     const overlay = document.getElementById('action-overlay');
     overlay.style.display = 'flex';
@@ -1036,7 +1100,7 @@ const UI = (() => {
   return {
     init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen,
     updateLobby, renderGame, showError, showToast, showLoading,
-    showDrawnCards, showDiscardPrompt, showWinner,
+    showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
     // Exposed for onclick handlers in HTML
     _closeOverlay, _doBank, _doPlayProperty, _doPassGo, _doRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,

@@ -393,32 +393,48 @@ const ClientGame = (() => {
     renderLocalGame();
   }
 
+  function _showCardBeforePlay(cardId) {
+    const player = gameState.players.find(p => p.id === gameState.currentPlayer);
+    if (!player) return;
+    const card = player.hand.find(c => c.id === cardId);
+    if (card) {
+      const name = playerNames[gameState.currentPlayer] || 'Unknown';
+      UI.showPlayedCard(card, name);
+    }
+  }
+
   function localPlayProperty(cardId, chosenColor) {
+    _showCardBeforePlay(cardId);
     GameEngine.playProperty(gameState, gameState.currentPlayer, cardId, chosenColor);
     renderLocalGame();
   }
 
   function localPlayPassGo(cardId) {
+    _showCardBeforePlay(cardId);
     GameEngine.playPassGo(gameState, gameState.currentPlayer, cardId);
     renderLocalGame();
   }
 
   function localPlayRent(cardId, color) {
+    _showCardBeforePlay(cardId);
     GameEngine.playRent(gameState, gameState.currentPlayer, cardId, color, null);
     renderLocalGame();
   }
 
   function localPlayDebtCollector(cardId, targetId) {
+    _showCardBeforePlay(cardId);
     GameEngine.playDebtCollector(gameState, gameState.currentPlayer, cardId, targetId);
     renderLocalGame();
   }
 
   function localPlayBirthday(cardId) {
+    _showCardBeforePlay(cardId);
     GameEngine.playBirthday(gameState, gameState.currentPlayer, cardId);
     renderLocalGame();
   }
 
   function localBankCard(cardId) {
+    _showCardBeforePlay(cardId);
     GameEngine.bankCard(gameState, gameState.currentPlayer, cardId);
     renderLocalGame();
   }
