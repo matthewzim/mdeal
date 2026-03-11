@@ -503,6 +503,36 @@ html, body {
   50% { opacity: 0.5; }
 }
 
+.opponent-card-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Left opponent: rotate card area 90° clockwise (cards face right) */
+#opponent-left .opponent-card-area {
+  transform: rotate(90deg);
+  transform-origin: center center;
+  align-self: center;
+  width: 90%;
+}
+
+/* Right opponent: rotate card area 90° counter-clockwise (cards face left) */
+#opponent-right .opponent-card-area {
+  transform: rotate(-90deg);
+  transform-origin: center center;
+  align-self: center;
+  width: 90%;
+}
+
+/* Top opponent: rotate card area 180° (upside down) and shrink */
+#opponent-top .opponent-card-area {
+  transform: rotate(180deg) scale(0.75);
+  transform-origin: center center;
+}
+
 .opponent-cards {
   display: flex;
   flex-wrap: wrap;
