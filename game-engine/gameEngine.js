@@ -548,3 +548,6 @@ const GameEngine = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { GameEngine };
 }
+if (typeof window !== 'undefined') {
+  window.MonopolyGameEngine = GameEngine;
+}

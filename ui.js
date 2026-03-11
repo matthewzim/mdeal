@@ -75,6 +75,26 @@ const UI = (() => {
         showLoading(false);
       }
     });
+
+    // Play Against Computer
+    document.getElementById('btn-play-computer').addEventListener('click', () => {
+      const name = document.getElementById('input-username').value.trim();
+      if (!name) return showError('Enter a username');
+      document.getElementById('computer-setup-modal').classList.add('active');
+    });
+
+    document.getElementById('btn-cancel-computer').addEventListener('click', () => {
+      document.getElementById('computer-setup-modal').classList.remove('active');
+    });
+
+    document.querySelectorAll('.btn-computer-count').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = document.getElementById('input-username').value.trim();
+        const count = parseInt(btn.dataset.count);
+        document.getElementById('computer-setup-modal').classList.remove('active');
+        ClientGame.startLocalGame(name, count);
+      });
+    });
   }
 
   // ── Lobby screen ─────────────────────────────────────────────────────

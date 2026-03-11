@@ -233,6 +233,63 @@ html, body {
   margin: 4px;
 }
 
+/* ── Play Against Computer ─────────────────────────────────────────── */
+
+.btn-computer {
+  background: #8e44ad;
+}
+
+#computer-setup-modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--overlay-bg);
+  z-index: 4000;
+  align-items: center;
+  justify-content: center;
+}
+
+#computer-setup-modal.active {
+  display: flex;
+}
+
+.computer-setup-box {
+  background: #1a2332;
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  padding: 32px;
+  width: 400px;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.computer-setup-box h3 {
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.computer-setup-hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-bottom: 20px;
+}
+
+.computer-count-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-computer-count {
+  background: #8e44ad;
+  padding: 14px 20px;
+  font-size: 1.05rem;
+}
+
+.btn-computer-count:hover:not(:disabled) {
+  background: #a155c2;
+}
+
 /* ── Lobby Screen ──────────────────────────────────────────────────── */
 
 #lobby-screen {
