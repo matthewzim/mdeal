@@ -32,7 +32,7 @@ html, body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: var(--felt-dark);
   color: var(--text-light);
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* ── Screens ───────────────────────────────────────────────────────── */
@@ -40,7 +40,7 @@ html, body {
 .screen {
   display: none;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   position: absolute;
   top: 0; left: 0;
 }
@@ -408,16 +408,16 @@ html, body {
 .game-table {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr 260px;
+  grid-template-columns: 260px 260px 1fr 260px;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
-    "top-left  top    game-info"
-    "left      center right"
-    "hand      hand   hand";
+    "top-left  top       top        game-info"
+    "left      right     center     ."
+    "hand      hand      hand       hand";
   gap: 8px;
   padding: 8px;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-y: auto;
 }
 
 /* ── Opponent Seats ────────────────────────────────────────────────── */
@@ -434,14 +434,18 @@ html, body {
 
 #opponent-top {
   grid-area: top;
+  max-height: 120px;
+  overflow: hidden;
 }
 
 #opponent-left {
   grid-area: left;
+  min-height: 2000px;
 }
 
 #opponent-right {
   grid-area: right;
+  min-height: 2000px;
 }
 
 #opponent-top-left {
@@ -1304,6 +1308,14 @@ html, body {
       "center"
       "hand"
       "left";
+  }
+
+  #opponent-top {
+    max-height: none;
+  }
+
+  #opponent-left, #opponent-right {
+    min-height: 0;
   }
 
   #opponent-left, #opponent-right, #opponent-top-left {
