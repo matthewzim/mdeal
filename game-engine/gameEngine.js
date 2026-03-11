@@ -151,6 +151,7 @@ const GameEngine = {
   },
 
   playProperty(state, playerId, cardId, chosenColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     if (card.type === CARD_TYPE.WILD_PROPERTY && chosenColor) {
@@ -169,6 +170,7 @@ const GameEngine = {
   },
 
   bankCard(state, playerId, cardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     player.bank.push(card);
@@ -183,6 +185,7 @@ const GameEngine = {
   },
 
   playPassGo(state, playerId, cardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -197,6 +200,7 @@ const GameEngine = {
   },
 
   playRent(state, playerId, cardId, targetColor, doubleCardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -250,6 +254,7 @@ const GameEngine = {
   },
 
   playDebtCollector(state, playerId, cardId, targetId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -269,6 +274,7 @@ const GameEngine = {
   },
 
   playBirthday(state, playerId, cardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -289,6 +295,7 @@ const GameEngine = {
   },
 
   playSlyDeal(state, playerId, cardId, targetId, targetCardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -310,6 +317,7 @@ const GameEngine = {
   },
 
   playForcedDeal(state, playerId, cardId, targetId, targetCardId, myCardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
@@ -332,6 +340,7 @@ const GameEngine = {
   },
 
   playDealBreaker(state, playerId, cardId, targetId, targetColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
     state.discardPile.push(card);
