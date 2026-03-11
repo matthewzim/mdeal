@@ -430,7 +430,6 @@ serve(async (req) => {
       if (state.currentPlayer !== playerId) return fail("Not your turn");
       const card = player.properties.find((c: any) => c.id === cardId);
       if (!card || card.type !== 'wild_property') return fail("Not a wild property");
-      if (isInCompletedSet(player, card)) return fail("Cannot move from completed set");
       if (card.colors[0] === 'all') {
         if (!ALL_COLORS.includes(chosenColor)) return fail("Invalid color");
       } else if (!card.colors.includes(chosenColor)) {

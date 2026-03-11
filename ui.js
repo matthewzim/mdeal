@@ -334,8 +334,8 @@ const UI = (() => {
             }
           });
         }
-        // Wild cards are switchable on player's turn (if not in a completed set)
-        else if (isMyTurn && card.type === 'wild_property' && !isCardInCompletedSet(player, card)) {
+        // Wild cards are switchable on player's turn
+        else if (isMyTurn && card.type === 'wild_property') {
           el.classList.add('switchable');
           el.addEventListener('click', () => showWildColorSwitch(card));
         }
