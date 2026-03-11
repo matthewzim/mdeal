@@ -890,6 +890,87 @@ const UI = (() => {
     renderActionBar(state, ClientGame.getPlayerId());
   }
 
+  // ── Card image path mapping ──────────────────────────────────────────
+
+  const CARD_IMAGE_MAP = {
+    // Property cards (by name)
+    'Mediterranean Ave': 'mediterranean.png',
+    'Baltic Ave': 'baltic.png',
+    'Park Place': 'park-place.png',
+    'Boardwalk': 'boardwalk.png',
+    'Oriental Ave': 'oriental.png',
+    'Vermont Ave': 'vermont.png',
+    'Connecticut Ave': 'connecticut.png',
+    'St. Charles Place': 'st-charles.png',
+    'Virginia Ave': 'virginia.png',
+    'States Ave': 'states.png',
+    'St. James Place': 'st-james.png',
+    'Tennessee Ave': 'tennessee.png',
+    'New York Ave': 'new-york.png',
+    'Kentucky Ave': 'kentucky.png',
+    'Indiana Ave': 'indiana.png',
+    'Illinois Ave': 'illinois.png',
+    'Atlantic Ave': 'atlantic.png',
+    'Ventnor Ave': 'ventnor.png',
+    'Marvin Gardens': 'marvin-gardens.png',
+    'Pacific Ave': 'pacific.png',
+    'North Carolina Ave': 'north-carolina.png',
+    'Pennsylvania Ave': 'pennsylvania.png',
+    'Reading Railroad': 'reading.png',
+    'Pennsylvania Railroad': 'pennsylvania-railrod.png',
+    'B&O Railroad': 'b-and-o.png',
+    'Short Line': 'short-line.png',
+    'Electric Company': 'electric.png',
+    'Water Works': 'water.png',
+    // Wild property cards
+    'Wild: Brown/Light Blue': 'wildcard-light-blue-and-brown.png',
+    'Wild: Dark Blue/Green': 'wildcard-dark-blue-and-green.png',
+    'Wild: Light Blue/Railroad': 'wildcard-light-blue-and-black.png',
+    'Wild: Pink/Orange': 'wildcard-orange-and-pink.png',
+    'Wild: Railroad/Utility': 'wildcard-utility-and-black.png',
+    'Wild: Railroad/Green': 'wildcard-green-and-black.png',
+    'Wild: Red/Yellow': 'wildcard-yellow-and-red.png',
+    'Wild Property': 'wildcard-all-colours.png',
+    // Action cards
+    'Pass Go': 'pass-go.png',
+    'Debt Collector': 'debt-collector.png',
+    "It's My Birthday": 'birthday.png',
+    'Double The Rent': 'double-rent.png',
+    'Sly Deal': 'sly-deal.png',
+    'Forced Deal': 'forced-deal.png',
+    'Deal Breaker': 'deal-breaker.png',
+    'Just Say No': 'say-no.png',
+    // Rent cards
+    'Rent: Brown/Lightblue': 'rent-brown-and-light-blue.png',
+    'Rent: Pink/Orange': 'rent-pink-and-orange.png',
+    'Rent: Red/Yellow': 'rent-red-and-yellow.png',
+    'Rent: Darkblue/Green': 'rent-dark-blue-and-green.png',
+    'Rent: Railroad/Utility': 'rent-black-and-utility.png',
+    'Multi Rent (Wild)': 'rent-all-colours.png',
+  };
+
+  const RENT_COLOR_IMAGE_MAP = {
+    'brown,lightblue': 'rent-brown-and-light-blue.png',
+    'pink,orange': 'rent-pink-and-orange.png',
+    'red,yellow': 'rent-red-and-yellow.png',
+    'darkblue,green': 'rent-dark-blue-and-green.png',
+    'railroad,utility': 'rent-black-and-utility.png',
+  };
+
+  function getCardImagePath(card) {
+    if (!card || !card.name) return null;
+    // Check direct name match
+    if (CARD_IMAGE_MAP[card.name]) return 'assets/cards/' + CARD_IMAGE_MAP[card.name];
+    // Money cards by value
+    if (card.type === 'money') return 'assets/cards/cash-' + card.value + 'M.png';
+    // Rent cards by rentColors
+    if (card.actionType === 'rent' && card.rentColors) {
+      const key = card.rentColors.join(',');
+      if (RENT_COLOR_IMAGE_MAP[key]) return 'assets/cards/' + RENT_COLOR_IMAGE_MAP[key];
+    }
+    return null;
+  }
+
   // ── Card element creation ────────────────────────────────────────────
 
   function createCardElement(card, interactive) {
@@ -897,7 +978,11 @@ const UI = (() => {
     el.className = 'card';
     el.dataset.cardId = card.id;
 
-    if (card.type === 'property') {
+    const imgPath = getCardImagePath(card);
+    if (imgPath) {
+      el.classList.add('card-has-image');
+      el.innerHTML = `<img class="card-img" src="${imgPath}" alt="${escapeHtml(card.name)}" draggable="false">`;
+    } else if (card.type === 'property') {
       el.classList.add('card-property');
       el.style.borderColor = COLOR_MAP[card.color] || '#666';
       el.style.borderTopColor = COLOR_MAP[card.color] || '#666';
@@ -956,6 +1041,10 @@ const UI = (() => {
   }
 
   function buildCardImageHtml(card) {
+    const imgPath = getCardImagePath(card);
+    if (imgPath) {
+      return `<img class="card-img" src="${imgPath}" alt="${escapeHtml(card.name)}" draggable="false">`;
+    }
     if (card.type === 'property') {
       return `
         <div class="card-img-bar" style="background:${COLOR_MAP[card.color] || '#666'}"></div>

@@ -926,6 +926,38 @@ html, body {
   background: rgba(0,0,0,0.05);
 }
 
+/* ── Image-based cards ─────────────────────────────────────────────── */
+
+.card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
+
+.card.card-has-image {
+  background: transparent;
+  border: none;
+  overflow: hidden;
+}
+
+.card-image-mini .card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
+
+.card-image-tiny .card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
+
 /* Card back */
 .card-back {
   background: linear-gradient(135deg, #2c3e50, #3498db);
