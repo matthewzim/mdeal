@@ -72,12 +72,24 @@ const SupabaseClient = (() => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
-    // If the token is expired or about to expire (within 30s), refresh it
+    // If the token is expired or about to expire (within 60s), refresh it.
+    // Also refresh when expires_at is missing to avoid sending a stale JWT.
     const expiresAt = session.expires_at; // Unix timestamp in seconds
     const now = Math.floor(Date.now() / 1000);
-    if (expiresAt && expiresAt - now < 30) {
+    if (!expiresAt || expiresAt - now < 60) {
       const { data: { session: refreshed } } = await supabase.auth.refreshSession();
-      return refreshed?.access_token;
+      if (refreshed?.access_token) {
+        return refreshed.access_token;
+      }
+
+      // Refresh failed (e.g. refresh token also expired). Re-authenticate.
+      try {
+        await signInAnonymously();
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        return newSession?.access_token || null;
+      } catch (_e) {
+        return null;
+      }
     }
 
     return session.access_token;
