@@ -28,6 +28,8 @@ const UI = (() => {
   let selectedDiscards = [];
   let actionTargetMode = null; // for targeting actions
   let lastRenderedHandIds = null; // track hand card IDs to avoid unnecessary re-renders
+  let playedCardFadeTimeout = null; // track showPlayedCard timeouts to avoid overlap
+  let playedCardCleanTimeout = null;
 
   // ── Screen management ────────────────────────────────────────────────
 
@@ -1049,6 +1051,11 @@ const UI = (() => {
 
   function showPlayedCard(card, playerName) {
     const container = document.getElementById('played-card-display');
+
+    // Cancel any pending timeouts from a previous card display
+    if (playedCardFadeTimeout) clearTimeout(playedCardFadeTimeout);
+    if (playedCardCleanTimeout) clearTimeout(playedCardCleanTimeout);
+
     container.innerHTML = '';
 
     const wrapper = document.createElement('div');
@@ -1067,9 +1074,9 @@ const UI = (() => {
     container.appendChild(wrapper);
 
     // Start fade-out after a delay, then remove
-    setTimeout(() => {
+    playedCardFadeTimeout = setTimeout(() => {
       wrapper.classList.add('fade-out');
-      setTimeout(() => { container.innerHTML = ''; }, 500);
+      playedCardCleanTimeout = setTimeout(() => { container.innerHTML = ''; }, 500);
     }, 1200);
   }
 
