@@ -525,7 +525,7 @@ const ClientGame = (() => {
 
   async function playSlyDealAny(cardId, targetId, targetCardId) {
     if (isLocalGame) {
-      // Sly Deal for local mode
+      _showCardBeforePlay(cardId);
       GameEngine.playSlyDeal(gameState, gameState.currentPlayer, cardId, targetId, targetCardId);
       renderLocalGame();
     } else {
@@ -535,6 +535,7 @@ const ClientGame = (() => {
 
   async function playForcedDealAny(cardId, targetId, targetCardId, myCardId) {
     if (isLocalGame) {
+      _showCardBeforePlay(cardId);
       GameEngine.playForcedDeal(gameState, gameState.currentPlayer, cardId, targetId, targetCardId, myCardId);
       renderLocalGame();
     } else {
@@ -544,6 +545,7 @@ const ClientGame = (() => {
 
   async function playDealBreakerAny(cardId, targetId, targetColor) {
     if (isLocalGame) {
+      _showCardBeforePlay(cardId);
       GameEngine.playDealBreaker(gameState, gameState.currentPlayer, cardId, targetId, targetColor);
       renderLocalGame();
     } else {
