@@ -1,6 +1,10 @@
 // Monopoly Deal - Rules Engine
 // Pure validation functions — no side effects
 
+// Wrap in IIFE to avoid redeclaring const variables from deck.js in the
+// global scope (which would cause a SyntaxError in the browser).
+;(function () {
+
 const {
   COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
 } = typeof require !== 'undefined'
@@ -325,3 +329,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.MonopolyRules = Rules;
 }
+
+})();

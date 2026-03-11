@@ -92,7 +92,12 @@ const UI = (() => {
         const name = document.getElementById('input-username').value.trim();
         const count = parseInt(btn.dataset.count);
         document.getElementById('computer-setup-modal').classList.remove('active');
-        ClientGame.startLocalGame(name, count);
+        try {
+          ClientGame.startLocalGame(name, count);
+        } catch (err) {
+          showError('Failed to start game: ' + err.message);
+          console.error(err);
+        }
       });
     });
   }
