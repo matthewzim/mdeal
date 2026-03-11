@@ -570,17 +570,8 @@ html, body {
   gap: 4px;
 }
 
-#opponent-left .opponent-properties,
-#opponent-right .opponent-properties {
-  flex-direction: column;
-  flex-wrap: nowrap;
-}
-
-#opponent-left .prop-group,
-#opponent-right .prop-group {
-  flex-direction: column;
-  align-items: flex-start;
-}
+/* Left/right opponents: keep default row direction because
+   the 90° rotation on .opponent-card-area converts row → visual column */
 
 .prop-group {
   display: inline-flex;
