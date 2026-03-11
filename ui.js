@@ -178,7 +178,7 @@ const UI = (() => {
     renderMyHand(myPlayer, state);
 
     // Render my properties
-    renderMyProperties(myPlayer);
+    renderMyProperties(myPlayer, state, myId);
 
     // Render my bank
     renderMyBank(myPlayer);
@@ -301,11 +301,12 @@ const UI = (() => {
     });
   }
 
-  function renderMyProperties(player) {
+  function renderMyProperties(player, state, myId) {
     const container = document.getElementById('my-properties');
     container.innerHTML = '';
     if (!player) return;
 
+    const isMyTurn = state && state.currentPlayer === myId;
     const groups = groupProperties(player.properties);
     for (const [color, cards] of Object.entries(groups)) {
       const groupEl = document.createElement('div');
@@ -332,6 +333,11 @@ const UI = (() => {
               actionTargetMode._callback(card.id);
             }
           });
+        }
+        // Wild cards are switchable on player's turn (if not in a completed set)
+        else if (isMyTurn && card.type === 'wild_property' && !isCardInCompletedSet(player, card)) {
+          el.classList.add('switchable');
+          el.addEventListener('click', () => showWildColorSwitch(card));
         }
         cardsRow.appendChild(el);
       }
@@ -730,6 +736,36 @@ const UI = (() => {
     html += `</div></div>`;
 
     overlay.innerHTML = html;
+  }
+
+  // ── Wild card color switch ──────────────────────────────────────────
+
+  function showWildColorSwitch(card) {
+    const overlay = document.getElementById('action-overlay');
+    overlay.style.display = 'flex';
+
+    const availableColors = card.colors[0] === 'all'
+      ? Object.keys(COLOR_MAP)
+      : card.colors;
+
+    let html = `<div class="action-modal card-action-modal">`;
+    html += `<h3>Switch Color</h3>`;
+    html += `<p class="card-detail">${escapeHtml(card.name)}</p>`;
+    html += `<div class="color-picker"><p>Switch to:</p>`;
+    for (const color of availableColors) {
+      if (color === card.currentColor) continue;
+      html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doSwitchWild('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+    }
+    html += `</div>`;
+    html += `<button class="btn btn-cancel" onclick="UI._closeOverlay()">Cancel</button>`;
+    html += `</div></div>`;
+
+    overlay.innerHTML = html;
+  }
+
+  async function _doSwitchWild(cardId, chosenColor) {
+    _closeOverlay();
+    await ClientGame.moveWild(cardId, chosenColor);
   }
 
   // ── Action handlers ──────────────────────────────────────────────────
@@ -1244,6 +1280,6 @@ const UI = (() => {
     _closeOverlay, _doBank, _doPlayProperty, _doPassGo, _doRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,
     _doForcedDeal, _doDealBreaker, _handleAccept, _handleJSN,
-    _togglePaymentCard, _confirmPayment,
+    _togglePaymentCard, _confirmPayment, _doSwitchWild,
   };
 })();
