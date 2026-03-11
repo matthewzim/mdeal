@@ -13,6 +13,8 @@ const ClientGame = (() => {
   let roomSubscription = null;
   let isLocalGame = false;
   let computerPlayerIds = [];
+  let chatMessages = [];
+  let chatSubscription = null;
 
   // ── Initialization ───────────────────────────────────────────────────
 
@@ -103,7 +105,32 @@ const ClientGame = (() => {
     }
 
     subscribeToGameUpdates();
+    subscribeToChatUpdates();
     UI.renderGame(gameState, playerId, playerNames);
+  }
+
+  function subscribeToChatUpdates() {
+    if (chatSubscription) return;
+    chatMessages = [];
+    chatSubscription = SupabaseClient.subscribeToChatChannel(roomId, (msg) => {
+      chatMessages.push(msg);
+      if (chatMessages.length > 100) chatMessages.shift();
+      UI.renderChatMessages(chatMessages);
+    });
+  }
+
+  function sendChat(text) {
+    if (!text || isLocalGame) return;
+    const msg = {
+      author: username,
+      playerId: playerId,
+      text: text,
+      time: Date.now(),
+    };
+    chatMessages.push(msg);
+    if (chatMessages.length > 100) chatMessages.shift();
+    SupabaseClient.sendChatMessage(roomId, msg);
+    UI.renderChatMessages(chatMessages);
   }
 
   function subscribeToGameUpdates() {
@@ -598,7 +625,7 @@ const ClientGame = (() => {
     setPlayer, getPlayerId, getUsername, getRoomId, getGameId,
     getGameState, getIsHost, getPlayerNames, isComputerGame,
     createRoom, joinRoom, toggleReady, startGame, loadGame,
-    refreshRoomPlayers, startLocalGame,
+    refreshRoomPlayers, startLocalGame, sendChat,
     // Use "Any" variants which route to local or online
     drawCards: drawCardsAny,
     playProperty: playPropertyAny,

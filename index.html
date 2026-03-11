@@ -126,6 +126,14 @@
       <div class="game-info-panel">
         <div id="game-info"></div>
         <div id="game-log"></div>
+        <div id="chat-panel">
+          <div class="chat-header">Chat</div>
+          <div id="chat-messages"></div>
+          <div id="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200" />
+            <button id="chat-send-btn" onclick="UI.sendChat()">Send</button>
+          </div>
+        </div>
       </div>
 
       <!-- My play area (properties + bank, just above hand) -->
