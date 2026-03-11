@@ -120,7 +120,7 @@ const ClientGame = (() => {
   }
 
   function sendChat(text) {
-    if (!text || isLocalGame) return;
+    if (!text) return;
     const msg = {
       author: username,
       playerId: playerId,
@@ -129,7 +129,9 @@ const ClientGame = (() => {
     };
     chatMessages.push(msg);
     if (chatMessages.length > 100) chatMessages.shift();
-    SupabaseClient.sendChatMessage(roomId, msg);
+    if (!isLocalGame) {
+      SupabaseClient.sendChatMessage(roomId, msg);
+    }
     UI.renderChatMessages(chatMessages);
   }
 

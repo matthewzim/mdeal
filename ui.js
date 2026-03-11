@@ -190,14 +190,10 @@ const UI = (() => {
     // Render game log
     renderGameLog(state.log, names);
 
-    // Show chat panel in online games only
+    // Show chat panel
     const chatPanel = document.getElementById('chat-panel');
     if (chatPanel) {
-      if (!ClientGame.isComputerGame()) {
-        chatPanel.classList.add('active');
-      } else {
-        chatPanel.classList.remove('active');
-      }
+      chatPanel.classList.add('active');
     }
 
     // Render deck and last action card in center
