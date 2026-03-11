@@ -562,9 +562,9 @@ html, body {
   width: 100%;
 }
 
-/* Top opponent: rotate card area 180° (upside down) and shrink */
+/* Top opponent: shrink card area */
 #opponent-top .opponent-card-area {
-  transform: rotate(180deg) scale(0.75);
+  transform: scale(0.75);
   transform-origin: center center;
 }
 
