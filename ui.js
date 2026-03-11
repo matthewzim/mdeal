@@ -233,6 +233,33 @@ const UI = (() => {
         propsHtml += `</div>`;
       }
 
+      const pos = positions[i];
+      const isSide = (pos === 'left' || pos === 'right');
+
+      const bankHtml = opp.bank.map(c => {
+        const hasImg = getCardImagePath(c) ? ' has-card-img' : '';
+        return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
+      }).join('');
+
+      const cardAreaHtml = isSide
+        ? `<div class="opponent-card-area opponent-card-area--columns">
+            <div class="opponent-column opponent-column--cash">
+              <div class="opponent-column-label">Cash</div>
+              <div class="opponent-bank">${bankHtml}</div>
+            </div>
+            <div class="opponent-column opponent-column--properties">
+              <div class="opponent-column-label">Properties</div>
+              <div class="opponent-properties">${propsHtml}</div>
+            </div>
+          </div>`
+        : `<div class="opponent-card-area">
+            <div class="opponent-cards">
+              ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
+            </div>
+            <div class="opponent-bank">${bankHtml}</div>
+            <div class="opponent-properties">${propsHtml}</div>
+          </div>`;
+
       el.innerHTML = `
         <div class="opponent-header">
           <div class="opponent-avatar">
@@ -248,18 +275,7 @@ const UI = (() => {
           </div>
           ${state.currentPlayer === opp.id ? '<div class="turn-indicator">TURN</div>' : ''}
         </div>
-        <div class="opponent-card-area">
-          <div class="opponent-cards">
-            ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
-          </div>
-          <div class="opponent-bank">
-            ${opp.bank.map(c => {
-              const hasImg = getCardImagePath(c) ? ' has-card-img' : '';
-              return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
-            }).join('')}
-          </div>
-          <div class="opponent-properties">${propsHtml}</div>
-        </div>
+        ${cardAreaHtml}
       `;
     });
   }

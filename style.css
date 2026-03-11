@@ -515,20 +515,44 @@ html, body {
   overflow: auto;
 }
 
-/* Left opponent: rotate card area 90° clockwise (cards face right) */
-#opponent-left .opponent-card-area {
-  transform: rotate(90deg);
-  transform-origin: center center;
-  align-self: center;
-  width: 90%;
+/* Left/Right opponents: two-column layout (cash | properties) */
+.opponent-card-area--columns {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  align-items: start;
 }
 
-/* Right opponent: rotate card area 90° counter-clockwise (cards face left) */
-#opponent-right .opponent-card-area {
-  transform: rotate(-90deg);
-  transform-origin: center center;
-  align-self: center;
-  width: 90%;
+.opponent-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.opponent-column-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.opponent-column--cash .opponent-bank {
+  flex-direction: column;
+}
+
+.opponent-column--properties .opponent-properties {
+  flex-direction: column;
+}
+
+.opponent-column--properties .prop-group {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 /* Top opponent: rotate card area 180° (upside down) and shrink */
@@ -566,9 +590,6 @@ html, body {
   flex-wrap: wrap;
   gap: 4px;
 }
-
-/* Left/right opponents: keep default row direction because
-   the 90° rotation on .opponent-card-area converts row → visual column */
 
 .prop-group {
   display: inline-flex;
