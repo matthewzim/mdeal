@@ -190,6 +190,12 @@ const UI = (() => {
     // Render game log
     renderGameLog(state.log, names);
 
+    // Show chat panel
+    const chatPanel = document.getElementById('chat-panel');
+    if (chatPanel) {
+      chatPanel.classList.add('active');
+    }
+
     // Render deck and last action card in center
     renderDeckAndDiscard(state);
 
@@ -1334,6 +1340,35 @@ const UI = (() => {
     `;
   }
 
+  // ── Chat ──────────────────────────────────────────────────────────────
+
+  function renderChatMessages(messages) {
+    const el = document.getElementById('chat-messages');
+    if (!el) return;
+
+    el.innerHTML = messages.map(msg => {
+      const time = new Date(msg.time);
+      const timeStr = time.getHours().toString().padStart(2, '0') + ':' +
+                      time.getMinutes().toString().padStart(2, '0');
+      return `<div class="chat-message">` +
+        `<span class="chat-author">${escapeHtml(msg.author)}:</span>` +
+        `${escapeHtml(msg.text)}` +
+        `<span class="chat-time">${timeStr}</span>` +
+        `</div>`;
+    }).join('');
+
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function sendChat() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    ClientGame.sendChat(text);
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────
 
   let initialized = false;
@@ -1342,12 +1377,21 @@ const UI = (() => {
     initialized = true;
     initLoginHandlers();
     initLobbyHandlers();
+
+    // Allow sending chat with Enter key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.id === 'chat-input') {
+        e.preventDefault();
+        sendChat();
+      }
+    });
   }
 
   return {
     init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen,
     updateLobby, renderGame, showError, showToast, showLoading,
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
+    renderChatMessages, sendChat,
     // Exposed for onclick handlers in HTML
     _closeOverlay, _doBank, _doPlayProperty, _doPassGo, _doRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,

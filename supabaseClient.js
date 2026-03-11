@@ -291,10 +291,34 @@ const SupabaseClient = (() => {
     subscriptions = [];
   }
 
+  // ── Chat (Realtime Broadcast) ──────────────────────────────────────
+
+  function subscribeToChatChannel(roomId, onMessage) {
+    const channel = supabase
+      .channel('chat_' + roomId)
+      .on('broadcast', { event: 'chat_message' }, (payload) => {
+        onMessage(payload.payload);
+      })
+      .subscribe();
+
+    subscriptions.push(channel);
+    return channel;
+  }
+
+  function sendChatMessage(roomId, message) {
+    const channel = supabase.channel('chat_' + roomId);
+    channel.send({
+      type: 'broadcast',
+      event: 'chat_message',
+      payload: message,
+    });
+  }
+
   return {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
     createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
     setReady, getRoomByCode, getRoomPlayers, getGame, getPlayerName,
     subscribeToRoom, subscribeToGame, unsubscribeAll,
+    subscribeToChatChannel, sendChatMessage,
   };
 })();
