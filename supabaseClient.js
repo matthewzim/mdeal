@@ -70,7 +70,17 @@ const SupabaseClient = (() => {
 
   async function getToken() {
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
+    if (!session) return null;
+
+    // If the token is expired or about to expire (within 30s), refresh it
+    const expiresAt = session.expires_at; // Unix timestamp in seconds
+    const now = Math.floor(Date.now() / 1000);
+    if (expiresAt && expiresAt - now < 30) {
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      return refreshed?.access_token;
+    }
+
+    return session.access_token;
   }
 
   // ── Edge Function calls ──────────────────────────────────────────────
