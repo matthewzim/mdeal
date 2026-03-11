@@ -513,7 +513,7 @@ html, body {
 .opponent-bank {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 4px;
   margin-bottom: 6px;
 }
 
@@ -533,7 +533,12 @@ html, body {
 }
 
 .prop-group {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.prop-group .card-image-tiny {
+  margin-right: 2px;
+  margin-bottom: 2px;
 }
 
 .prop-group-label {
@@ -588,31 +593,111 @@ html, body {
 
 .my-prop-cards {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ── Card Image Mini (property cards as visual cards) ─────────────── */
+
+.card-image-mini {
+  width: 64px;
+  height: 90px;
+  border-radius: 5px;
+  background: var(--card-bg);
+  color: var(--text-dark);
+  display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.property-card-mini {
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  background: rgba(255,255,255,0.08);
-  border-left: 4px solid;
-  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px var(--card-shadow);
+  border: 1.5px solid rgba(0,0,0,0.15);
+  flex-shrink: 0;
   cursor: default;
-  transition: background 0.15s;
+  transition: transform 0.15s, box-shadow 0.15s, outline 0.15s;
 }
 
-.property-card-mini.selectable {
+.card-image-mini .card-img-bar {
+  height: 20px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.card-image-mini .card-img-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.5rem;
+  font-weight: 600;
+  padding: 2px 3px;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.card-image-mini .card-img-value {
+  padding: 2px 3px;
+  text-align: center;
+  font-size: 0.55rem;
+  font-weight: bold;
+  background: rgba(0,0,0,0.06);
+  flex-shrink: 0;
+}
+
+.card-image-mini.selectable {
   cursor: pointer;
 }
 
-.property-card-mini.selectable:hover {
-  background: rgba(255,255,255,0.2);
+.card-image-mini.selectable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px var(--card-shadow);
 }
 
-.property-card-mini.selected {
-  background: rgba(231, 76, 60, 0.3);
-  outline: 2px solid var(--accent-red);
+.card-image-mini.selected {
+  outline: 2.5px solid var(--accent-red);
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.4);
+}
+
+/* Tiny card images for opponent areas */
+.card-image-tiny {
+  width: 42px;
+  height: 58px;
+  border-radius: 3px;
+  background: var(--card-bg);
+  color: var(--text-dark);
+  display: inline-flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 1px 3px var(--card-shadow);
+  border: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0;
+}
+
+.card-image-tiny .card-img-bar {
+  height: 12px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.card-image-tiny .card-img-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.4rem;
+  font-weight: 600;
+  padding: 1px 2px;
+  line-height: 1.1;
+  overflow: hidden;
+}
+
+.card-image-tiny .card-img-value {
+  padding: 1px 2px;
+  text-align: center;
+  font-size: 0.4rem;
+  font-weight: bold;
+  background: rgba(0,0,0,0.06);
+  flex-shrink: 0;
 }
 
 /* My bank */
@@ -623,7 +708,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .bank-header {
@@ -631,6 +716,7 @@ html, body {
   font-size: 0.85rem;
   color: var(--accent-green);
   margin-right: 8px;
+  width: 100%;
 }
 
 .bank-card {
@@ -976,7 +1062,8 @@ html, body {
 .payment-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  align-items: flex-start;
 }
 
 /* Winner modal */
@@ -1153,5 +1240,22 @@ html, body {
 
   .card-name {
     font-size: 0.55rem;
+  }
+
+  .card-image-mini {
+    width: 52px;
+    height: 74px;
+  }
+
+  .card-image-mini .card-img-bar {
+    height: 16px;
+  }
+
+  .card-image-mini .card-img-name {
+    font-size: 0.4rem;
+  }
+
+  .card-image-mini .card-img-value {
+    font-size: 0.45rem;
   }
 }

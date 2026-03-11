@@ -252,7 +252,7 @@ const UI = (() => {
           ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
         </div>
         <div class="opponent-bank">
-          ${opp.bank.map(c => `<div class="bank-chip">${c.value}M</div>`).join('')}
+          ${opp.bank.map(c => `<div class="card-image-tiny">${buildCardImageHtml(c)}</div>`).join('')}
         </div>
         <div class="opponent-properties">${propsHtml}</div>
       `;
@@ -348,9 +348,9 @@ const UI = (() => {
 
     for (const card of player.bank) {
       const el = document.createElement('div');
-      el.className = 'bank-card';
-      el.textContent = `${card.value}M`;
+      el.className = 'card-image-mini bank-card-img';
       el.dataset.cardId = card.id;
+      el.innerHTML = buildCardImageHtml(card);
       container.appendChild(el);
     }
   }
@@ -572,14 +572,13 @@ const UI = (() => {
     `;
 
     for (const card of myPlayer.bank) {
-      html += `<div class="bank-card selectable" data-card-id="${card.id}" data-value="${card.value}" data-source="bank" onclick="UI._togglePaymentCard(this)">${card.value}M</div>`;
+      html += `<div class="card-image-mini selectable" data-card-id="${card.id}" data-value="${card.value}" data-source="bank" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
     }
 
     html += `</div></div><div class="payment-section"><h4>Properties</h4><div class="payment-cards" id="payment-props">`;
 
     for (const card of myPlayer.properties) {
-      const color = card.type === 'wild_property' ? card.currentColor : card.color;
-      html += `<div class="property-card-mini selectable" style="border-color:${COLOR_MAP[color] || '#666'}" data-card-id="${card.id}" data-value="${card.value}" data-source="property" onclick="UI._togglePaymentCard(this)">${escapeHtml(card.name)} (${card.value}M)</div>`;
+      html += `<div class="card-image-mini selectable" data-card-id="${card.id}" data-value="${card.value}" data-source="property" onclick="UI._togglePaymentCard(this)">${buildCardImageHtml(card)}</div>`;
     }
 
     html += `
@@ -944,17 +943,51 @@ const UI = (() => {
 
   function createPropertyCardElement(card) {
     const el = document.createElement('div');
-    const color = card.type === 'wild_property' ? card.currentColor : card.color;
-    el.className = 'property-card-mini';
-    el.style.borderColor = COLOR_MAP[color] || '#666';
-    el.innerHTML = `<span>${escapeHtml(card.name)}</span>`;
+    el.className = 'card-image-mini';
     el.dataset.cardId = card.id;
+    el.innerHTML = buildCardImageHtml(card);
     return el;
   }
 
   function createMiniPropertyCard(card) {
-    const color = card.type === 'wild_property' ? card.currentColor : card.color;
-    return `<div class="property-card-mini" style="border-color:${COLOR_MAP[color] || '#666'}"><span>${escapeHtml(card.name)}</span></div>`;
+    return `<div class="card-image-tiny">${buildCardImageHtml(card)}</div>`;
+  }
+
+  function buildCardImageHtml(card) {
+    if (card.type === 'property') {
+      return `
+        <div class="card-img-bar" style="background:${COLOR_MAP[card.color] || '#666'}"></div>
+        <div class="card-img-name">${escapeHtml(card.name)}</div>
+        <div class="card-img-value">${card.value}M</div>
+      `;
+    } else if (card.type === 'wild_property') {
+      const color = card.currentColor || card.colors[0];
+      const barBg = card.colors[0] === 'all'
+        ? 'linear-gradient(135deg, #ff0, #f0f, #0ff, #0f0)'
+        : `linear-gradient(135deg, ${COLOR_MAP[card.colors[0]]}, ${COLOR_MAP[card.colors[1]]})`;
+      return `
+        <div class="card-img-bar" style="background:${barBg}"></div>
+        <div class="card-img-name">${escapeHtml(card.name)}</div>
+        <div class="card-img-value">${card.value}M</div>
+      `;
+    } else if (card.type === 'money') {
+      return `
+        <div class="card-img-bar" style="background:#2ecc71"></div>
+        <div class="card-img-name">${card.value}M</div>
+        <div class="card-img-value">Money</div>
+      `;
+    } else if (card.type === 'action') {
+      let actionColor = '#e67e22';
+      if (card.actionType === 'just_say_no') actionColor = '#e74c3c';
+      if (card.actionType === 'rent' || card.actionType === 'multi_rent') actionColor = '#3498db';
+      if (card.actionType === 'deal_breaker') actionColor = '#9b59b6';
+      return `
+        <div class="card-img-bar" style="background:${actionColor}"></div>
+        <div class="card-img-name">${escapeHtml(card.name)}</div>
+        <div class="card-img-value">${card.value}M</div>
+      `;
+    }
+    return `<div class="card-img-name">${escapeHtml(card.name || '?')}</div>`;
   }
 
   // ── Helper functions ─────────────────────────────────────────────────
