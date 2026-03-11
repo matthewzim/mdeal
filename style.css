@@ -543,7 +543,9 @@ html, body {
 }
 
 .opponent-column--cash .opponent-bank {
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
 .opponent-column--properties .opponent-properties {
@@ -551,8 +553,13 @@ html, body {
 }
 
 .opponent-column--properties .prop-group {
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: flex-start;
+}
+
+.opponent-column--properties .prop-group .prop-group-label {
+  width: 100%;
 }
 
 /* Top opponent: rotate card area 180° (upside down) and shrink */
