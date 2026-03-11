@@ -409,10 +409,11 @@ html, body {
   flex: 1;
   display: grid;
   grid-template-columns: 260px 1fr 260px 260px;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "top-left  top       .          game-info"
     "left      center    right      game-info"
+    "my-area   my-area   my-area    game-info"
     "hand      hand      hand       game-info";
   gap: 8px;
   padding: 8px;
@@ -434,18 +435,14 @@ html, body {
 
 #opponent-top {
   grid-area: top;
-  max-height: 120px;
-  overflow: hidden;
 }
 
 #opponent-left {
   grid-area: left;
-  max-height: 500px;
 }
 
 #opponent-right {
   grid-area: right;
-  max-height: 500px;
 }
 
 #opponent-top-left {
@@ -604,6 +601,16 @@ html, body {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  padding: 8px;
+}
+
+/* ── My Play Area (properties + bank, above hand) ─────────────────── */
+
+.my-play-area {
+  grid-area: my-area;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px;
 }
 
@@ -1318,17 +1325,14 @@ html, body {
 @media (max-width: 900px) {
   .game-table {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-rows: auto auto 1fr auto auto auto;
     grid-template-areas:
       "top"
       "game-info"
       "center"
+      "my-area"
       "hand"
       "left";
-  }
-
-  #opponent-top {
-    max-height: none;
   }
 
   #opponent-left, #opponent-right {
