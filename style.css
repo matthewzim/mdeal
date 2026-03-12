@@ -544,8 +544,8 @@ html, body {
 }
 
 .opponent-column--cash .opponent-bank {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
   gap: 4px;
 }
 
