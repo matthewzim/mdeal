@@ -1179,10 +1179,32 @@ const UI = (() => {
     return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(card)}</div>`;
   }
 
+  // For dual-color wildcards, the image is designed with one color on top.
+  // When switched to the other color, rotate 180° so the card visually flips.
+  // Maps card name → the color that leaves the image unrotated.
+  const WILD_UNROTATED_COLOR = {
+    'Wild: Dark Blue/Green': 'darkblue',
+    'Wild: Railroad/Green': 'green',
+    'Wild: Light Blue/Railroad': 'lightblue',
+    'Wild: Brown/Light Blue': 'lightblue',
+    'Wild: Pink/Orange': 'orange',
+    'Wild: Railroad/Utility': 'utility',
+    'Wild: Red/Yellow': 'yellow',
+  };
+
+  function shouldRotateWild(card) {
+    if (card.type !== 'wild_property') return false;
+    const unrotated = WILD_UNROTATED_COLOR[card.name];
+    if (!unrotated) return false;
+    const current = card.currentColor || card.colors[0];
+    return current !== unrotated;
+  }
+
   function buildCardImageHtml(card) {
     const imgPath = getCardImagePath(card);
     if (imgPath) {
-      return `<img class="card-img" src="${imgPath}" alt="${escapeHtml(card.name)}" draggable="false">`;
+      const rotate = shouldRotateWild(card) ? ' style="transform:rotate(180deg)"' : '';
+      return `<img class="card-img"${rotate} src="${imgPath}" alt="${escapeHtml(card.name)}" draggable="false">`;
     }
     if (card.type === 'property') {
       return `
