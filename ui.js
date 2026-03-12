@@ -395,8 +395,9 @@ const UI = (() => {
       return;
     }
 
-    // Check if the hand cards have actually changed
-    const currentIds = player.hand.filter(c => c.type !== 'hidden').map(c => c.id).join(',');
+    // Check if the hand cards or interactive state have actually changed
+    const currentIds = player.hand.filter(c => c.type !== 'hidden').map(c => c.id).join(',')
+      + '|' + state.phase + '|' + state.turnPlaysRemaining + '|' + state.currentPlayer;
     if (!forceRender && lastRenderedHandIds === currentIds && !discardMode) {
       return; // hand hasn't changed, skip re-render
     }
