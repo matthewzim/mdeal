@@ -368,7 +368,7 @@ const UI = (() => {
           </div>`;
 
       el.innerHTML = `
-        <div class="opponent-header">
+        <div class="opponent-header${state.currentPlayer === opp.id ? ' active-turn' : ''}">
           <div class="opponent-avatar">
             <div class="avatar-circle">${name.charAt(0).toUpperCase()}</div>
           </div>
