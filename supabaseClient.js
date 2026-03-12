@@ -6,7 +6,7 @@ const SupabaseClient = (() => {
   // CONFIGURATION
   // ══════════════════════════════════════════════════════════════════════
   const SUPABASE_URL = 'https://jonhtpjyllblmraocfvc.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impvbmh0cGp5bGxibG1yYW9jZnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNzc1NzEsImV4cCI6MjA4ODc1MzU3MX0.Z2FFWB-NDDEs9oj32uORA3wjv1ZNzfYCNmahb4ZTm30';
+  const SUPABASE_ANON_KEY = 'sb_publishable_7wQfaSjNWBWUMQVSfV-sUA_zQ5QtYDF';
   let supabase = null;
   let currentUser = null;
   let subscriptions = [];
