@@ -416,6 +416,16 @@ const GameEngine = {
 
       if (pending.respondQueue.length === 0 || pending.currentResponder === null) {
         // All responded, now collect payments
+        // Skip players with no assets — nothing to give
+        for (const t of pending.targets) {
+          if (!t.cancelled && !t.paid) {
+            const p = Rules.getPlayer(state, t.playerId);
+            if (Rules.totalAssets(p) === 0) {
+              t.paid = true;
+              state.log.push({ type: 'skip_payment', player: t.playerId, reason: 'no_assets' });
+            }
+          }
+        }
         const unpaid = pending.targets.filter(t => !t.cancelled && !t.paid);
         if (unpaid.length > 0) {
           state.phase = 'pay';
@@ -471,8 +481,18 @@ const GameEngine = {
       propertyCards: propertyCardIds.length,
     });
 
-    // Check for next payer
-    const nextUnpaid = pending.targets.find(t => !t.cancelled && !t.paid);
+    // Check for next payer, skipping those with no assets
+    let nextUnpaid = pending.targets.find(t => !t.cancelled && !t.paid);
+    while (nextUnpaid) {
+      const np = Rules.getPlayer(state, nextUnpaid.playerId);
+      if (Rules.totalAssets(np) === 0) {
+        nextUnpaid.paid = true;
+        state.log.push({ type: 'skip_payment', player: nextUnpaid.playerId, reason: 'no_assets' });
+        nextUnpaid = pending.targets.find(t => !t.cancelled && !t.paid);
+      } else {
+        break;
+      }
+    }
     if (nextUnpaid) {
       pending.currentPayer = nextUnpaid.playerId;
     } else {
