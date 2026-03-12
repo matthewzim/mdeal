@@ -1,0 +1,17 @@
+[functions.createRoom]
+verify_jwt = false
+
+[functions.joinRoom]
+verify_jwt = false
+
+[functions.startGame]
+verify_jwt = false
+
+[functions.playCard]
+verify_jwt = false
+
+[functions.endTurn]
+verify_jwt = false
+
+[functions.respondAction]
+verify_jwt = false
