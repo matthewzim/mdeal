@@ -53,15 +53,34 @@
         <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">
       </div>
 
-      <button class="btn btn-create" id="btn-create-room" style="width:100%">Create Room</button>
+      <div class="create-room-row">
+        <button class="btn btn-create" id="btn-create-room">Create Room</button>
+        <div class="toggle-container" id="toggle-public">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-public-input">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label" id="toggle-label">Private</span>
+        </div>
+      </div>
 
       <div class="separator">— or join an existing room —</div>
+
+      <div id="public-games-section">
+        <h3 class="public-games-heading">Public Games</h3>
+        <div id="public-games-list" class="public-games-list">
+          <div class="public-games-empty">No public games available</div>
+        </div>
+        <button class="btn btn-refresh" id="btn-refresh-public" style="width:100%; margin-top:8px">Refresh List</button>
+      </div>
+
+      <div class="separator">— or join a private room —</div>
 
       <div class="input-group">
         <input type="text" id="input-room-code" placeholder="Room Code (e.g. ABCDEF)" maxlength="6" style="text-transform:uppercase; letter-spacing:4px; text-align:center" autocomplete="off">
       </div>
 
-      <button class="btn btn-join" id="btn-join-room" style="width:100%">Join Room</button>
+      <button class="btn btn-join" id="btn-join-room" style="width:100%">Join Private Room</button>
 
       <div class="separator">— or play solo —</div>
 
@@ -89,8 +108,11 @@
   <div id="lobby-screen" class="screen">
     <div class="lobby-box">
       <h2>Game Lobby</h2>
-      <div class="room-code-display" id="lobby-room-code">------</div>
-      <div class="room-code-hint">Click to copy room code. Share it with friends!</div>
+      <div id="lobby-room-code-section">
+        <div class="room-code-display" id="lobby-room-code">------</div>
+        <div class="room-code-hint">Click to copy room code. Share it with friends!</div>
+      </div>
+      <div id="lobby-public-badge" class="lobby-public-badge" style="display:none">PUBLIC GAME</div>
 
       <div id="lobby-player-list"></div>
 

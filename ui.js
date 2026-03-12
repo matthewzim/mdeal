@@ -46,13 +46,21 @@ const UI = (() => {
   // ── Login screen ─────────────────────────────────────────────────────
 
   function initLoginHandlers() {
+    // Public/Private toggle
+    const toggleInput = document.getElementById('toggle-public-input');
+    const toggleLabel = document.getElementById('toggle-label');
+    toggleInput.addEventListener('change', () => {
+      toggleLabel.textContent = toggleInput.checked ? 'Public' : 'Private';
+    });
+
     document.getElementById('btn-create-room').addEventListener('click', async () => {
       const name = document.getElementById('input-username').value.trim();
       if (!name) return showError('Enter a username');
+      const isPublic = toggleInput.checked;
       try {
         showLoading(true);
-        const data = await ClientGame.createRoom(name);
-        document.getElementById('lobby-room-code').textContent = data.roomCode;
+        const data = await ClientGame.createRoom(name, isPublic);
+        updateLobbyRoomCodeVisibility(isPublic, data.roomCode);
         showLobbyScreen();
         await ClientGame.refreshRoomPlayers();
       } catch (err) {
@@ -70,7 +78,7 @@ const UI = (() => {
       try {
         showLoading(true);
         const data = await ClientGame.joinRoom(name, code);
-        document.getElementById('lobby-room-code').textContent = data.roomCode;
+        updateLobbyRoomCodeVisibility(false, data.roomCode);
         showLobbyScreen();
         await ClientGame.refreshRoomPlayers();
       } catch (err) {
@@ -78,6 +86,11 @@ const UI = (() => {
       } finally {
         showLoading(false);
       }
+    });
+
+    // Refresh public games list
+    document.getElementById('btn-refresh-public').addEventListener('click', () => {
+      refreshPublicGames();
     });
 
     // Play Against Computer
@@ -104,6 +117,66 @@ const UI = (() => {
         }
       });
     });
+
+    // Load public games on init
+    refreshPublicGames();
+  }
+
+  function updateLobbyRoomCodeVisibility(isPublic, roomCode) {
+    const codeSection = document.getElementById('lobby-room-code-section');
+    const publicBadge = document.getElementById('lobby-public-badge');
+    if (isPublic) {
+      codeSection.style.display = 'none';
+      publicBadge.style.display = 'block';
+    } else {
+      codeSection.style.display = 'block';
+      publicBadge.style.display = 'none';
+      document.getElementById('lobby-room-code').textContent = roomCode;
+    }
+  }
+
+  async function refreshPublicGames() {
+    const listEl = document.getElementById('public-games-list');
+    if (!listEl) return;
+    try {
+      const rooms = await SupabaseClient.getPublicRooms();
+      if (!rooms || rooms.length === 0) {
+        listEl.innerHTML = '<div class="public-games-empty">No public games available</div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      for (const room of rooms) {
+        const players = room.room_players || [];
+        const playerNames = players.map(p => p.players?.username || 'Unknown');
+        const div = document.createElement('div');
+        div.className = 'public-game-item';
+        div.innerHTML = `
+          <div class="public-game-info">
+            <div class="public-game-players-count">${players.length}/4 Players</div>
+            <div class="public-game-player-names">${playerNames.map(n => escapeHtml(n)).join(', ')}</div>
+          </div>
+          <button class="btn btn-join btn-join-public" data-room-code="${room.room_code}">Join</button>
+        `;
+        div.querySelector('.btn-join-public').addEventListener('click', async () => {
+          const name = document.getElementById('input-username').value.trim();
+          if (!name) return showError('Enter a username');
+          try {
+            showLoading(true);
+            const data = await ClientGame.joinPublicRoom(name, room.room_code);
+            updateLobbyRoomCodeVisibility(true, data.roomCode);
+            showLobbyScreen();
+            await ClientGame.refreshRoomPlayers();
+          } catch (err) {
+            showError(err.message);
+          } finally {
+            showLoading(false);
+          }
+        });
+        listEl.appendChild(div);
+      }
+    } catch (err) {
+      listEl.innerHTML = '<div class="public-games-empty">Failed to load public games</div>';
+    }
   }
 
   // ── Lobby screen ─────────────────────────────────────────────────────
@@ -1434,7 +1507,7 @@ const UI = (() => {
 
   return {
     init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen,
-    updateLobby, renderGame, showError, showToast, showLoading,
+    updateLobby, refreshPublicGames, renderGame, showError, showToast, showLoading,
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
     renderChatMessages, sendChat,
     // Exposed for onclick handlers in HTML

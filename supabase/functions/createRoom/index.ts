@@ -21,7 +21,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { username } = await req.json();
+    const { username, isPublic } = await req.json();
     if (!username || typeof username !== "string" || username.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: "Username is required" }),
@@ -69,6 +69,7 @@ serve(async (req) => {
         room_code: roomCode,
         host_id: playerId,
         status: "waiting",
+        is_public: !!isPublic,
       })
       .select()
       .single();

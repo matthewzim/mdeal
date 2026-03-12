@@ -103,9 +103,9 @@ serve(async (req) => {
       );
     }
 
-    if (existingPlayers.length >= 5) {
+    if (existingPlayers.length >= 4) {
       return new Response(
-        JSON.stringify({ error: "Room is full (max 5 players)" }),
+        JSON.stringify({ error: "Room is full (max 4 players)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   host_id    UUID REFERENCES players(id) ON DELETE SET NULL,
   status     TEXT NOT NULL DEFAULT 'waiting'
                CHECK (status IN ('waiting', 'playing', 'finished')),
+  is_public  BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
