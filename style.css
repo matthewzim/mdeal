@@ -290,6 +290,167 @@ html, body {
   background: #a155c2;
 }
 
+/* ── Create Room Row & Toggle ─────────────────────────────────────── */
+
+.create-room-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.create-room-row .btn-create {
+  flex: 1;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toggle-label {
+  font-size: 0.8rem;
+  min-width: 48px;
+  opacity: 0.8;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #555;
+  border-radius: 24px;
+  transition: background 0.3s;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent-green);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* ── Public Games List ────────────────────────────────────────────── */
+
+#public-games-section {
+  margin-bottom: 4px;
+}
+
+.public-games-heading {
+  color: var(--gold);
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.public-games-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.public-games-empty {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.85rem;
+  opacity: 0.5;
+}
+
+.public-game-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  margin-bottom: 4px;
+  transition: background 0.2s;
+}
+
+.public-game-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.public-game-info {
+  flex: 1;
+  text-align: left;
+  min-width: 0;
+}
+
+.public-game-players-count {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+.public-game-player-names {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-join-public {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.btn-refresh {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  font-size: 0.85rem;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ── Lobby Public Badge ───────────────────────────────────────────── */
+
+.lobby-public-badge {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--accent-green);
+  background: rgba(46, 204, 113, 0.15);
+  border: 2px solid rgba(46, 204, 113, 0.4);
+  border-radius: 12px;
+  padding: 12px 24px;
+  margin: 16px 0;
+  letter-spacing: 3px;
+}
+
 /* ── Lobby Screen ──────────────────────────────────────────────────── */
 
 #lobby-screen {

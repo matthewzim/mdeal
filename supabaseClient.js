@@ -171,8 +171,8 @@ const SupabaseClient = (() => {
     return data;
   }
 
-  async function createRoom(username) {
-    return callFunction('createRoom', { username });
+  async function createRoom(username, isPublic) {
+    return callFunction('createRoom', { username, isPublic: !!isPublic });
   }
 
   async function joinRoom(username, roomCode) {
@@ -252,6 +252,30 @@ const SupabaseClient = (() => {
     return data?.username || 'Unknown';
   }
 
+  // ── Public rooms ────────────────────────────────────────────────────
+
+  async function getPublicRooms() {
+    const { data: rooms, error } = await supabase
+      .from('rooms')
+      .select(`
+        id,
+        room_code,
+        status,
+        created_at,
+        room_players (
+          player_id,
+          seat_position,
+          players ( username )
+        )
+      `)
+      .eq('is_public', true)
+      .eq('status', 'waiting')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // Filter out rooms that are already full (4 players)
+    return (rooms || []).filter(r => (r.room_players || []).length < 4);
+  }
+
   // ── Realtime ─────────────────────────────────────────────────────────
 
   function subscribeToRoom(roomId, onRoomChange) {
@@ -318,6 +342,7 @@ const SupabaseClient = (() => {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
     createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
     setReady, getRoomByCode, getRoomPlayers, getGame, getPlayerName,
+    getPublicRooms,
     subscribeToRoom, subscribeToGame, unsubscribeAll,
     subscribeToChatChannel, sendChatMessage,
   };

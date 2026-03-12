@@ -15,6 +15,7 @@ const ClientGame = (() => {
   let computerPlayerIds = [];
   let chatMessages = [];
   let chatSubscription = null;
+  let roomIsPublic = false;
 
   // ── Initialization ───────────────────────────────────────────────────
 
@@ -33,8 +34,11 @@ const ClientGame = (() => {
 
   // ── Room management ──────────────────────────────────────────────────
 
-  async function createRoom(name) {
-    const data = await SupabaseClient.createRoom(name);
+  function getRoomIsPublic() { return roomIsPublic; }
+
+  async function createRoom(name, isPublic) {
+    roomIsPublic = !!isPublic;
+    const data = await SupabaseClient.createRoom(name, isPublic);
     roomId = data.roomId;
     playerId = data.playerId;
     username = name;
@@ -49,6 +53,18 @@ const ClientGame = (() => {
     playerId = data.playerId;
     username = name;
     isHost = false;
+    roomIsPublic = false;
+    subscribeToRoomUpdates();
+    return data;
+  }
+
+  async function joinPublicRoom(name, roomCode) {
+    const data = await SupabaseClient.joinRoom(name, roomCode);
+    roomId = data.roomId;
+    playerId = data.playerId;
+    username = name;
+    isHost = false;
+    roomIsPublic = true;
     subscribeToRoomUpdates();
     return data;
   }
@@ -654,7 +670,8 @@ const ClientGame = (() => {
   return {
     setPlayer, getPlayerId, getUsername, getRoomId, getGameId,
     getGameState, getIsHost, getPlayerNames, isComputerGame,
-    createRoom, joinRoom, toggleReady, startGame, loadGame,
+    getRoomIsPublic,
+    createRoom, joinRoom, joinPublicRoom, toggleReady, startGame, loadGame,
     refreshRoomPlayers, startLocalGame, sendChat,
     // Use "Any" variants which route to local or online
     drawCards: drawCardsAny,
