@@ -568,6 +568,44 @@ html, body {
   transform-origin: center center;
 }
 
+/* Top opponent: two-row layout (cash | properties) */
+.opponent-card-area--rows {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opponent-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opponent-row-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.opponent-row--cash .opponent-bank {
+  margin-bottom: 0;
+}
+
+/* In rows layout, prop groups stack label on top of cards */
+.opponent-card-area--rows .prop-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.opponent-card-area--rows .prop-group .prop-group-label {
+  width: 100%;
+  margin-bottom: 2px;
+}
+
 .opponent-cards {
   display: flex;
   flex-wrap: wrap;
