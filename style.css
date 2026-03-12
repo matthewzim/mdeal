@@ -749,10 +749,8 @@ html, body {
   width: 100%;
 }
 
-/* Top opponent: shrink card area and center it */
+/* Top opponent: center card area */
 #opponent-top .opponent-card-area {
-  transform: scale(0.75);
-  transform-origin: top center;
   align-items: center;
 }
 
