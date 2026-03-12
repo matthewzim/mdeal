@@ -420,7 +420,13 @@ const UI = (() => {
           el.classList.add('selected');
         }
       } else if (state.currentPlayer === player.id && state.phase === 'play' && state.turnPlaysRemaining > 0) {
-        el.addEventListener('click', () => showCardActions(card, state, player));
+        if (card.type === 'money') {
+          el.addEventListener('click', () => _doBank(card.id));
+        } else if (card.type === 'property') {
+          el.addEventListener('click', () => _doPlayProperty(card.id));
+        } else {
+          el.addEventListener('click', () => showCardActions(card, state, player));
+        }
       }
 
       container.appendChild(el);
