@@ -487,7 +487,6 @@ const UI = (() => {
 
     // Last action card (slightly to the left)
     html += '<div class="last-action-card-slot">';
-    html += '<div class="slot-label">Last Action</div>';
     if (lastActionCard) {
       const cardEl = createCardElement(lastActionCard, false);
       // We need to build HTML string, so use innerHTML approach
@@ -513,7 +512,6 @@ const UI = (() => {
     // Deck (slightly to the right)
     if (deckCount > 0) {
       html += '<div class="deck-card-slot">';
-      html += '<div class="slot-label">Deck</div>';
       html += `<img class="deck-card-img" src="assets/cards/back-cover.png" alt="Deck" draggable="false">`;
       html += `<div class="deck-count">${deckCount} cards</div>`;
       html += '</div>';
@@ -880,16 +878,16 @@ const UI = (() => {
     return myPlayer.hand.find(c => c.id === cardId);
   }
 
-  function _showMyPlayedCard(cardId) {
+  function _showMyPlayedCard(cardId, banked) {
     const card = _getCardFromHand(cardId);
     if (card) {
       const name = ClientGame.getPlayerNames()[ClientGame.getPlayerId()] || 'You';
-      showPlayedCard(card, name);
+      showPlayedCard(card, name, banked);
     }
   }
 
   async function _doBank(cardId) {
-    _showMyPlayedCard(cardId);
+    _showMyPlayedCard(cardId, true);
     _closeOverlay();
     await ClientGame.bankCard(cardId);
   }
@@ -1314,11 +1312,11 @@ const UI = (() => {
     showToast(`Drew ${cards.length} card(s)`);
   }
 
-  function showPlayedCard(card, playerName) {
+  function showPlayedCard(card, playerName, banked) {
     const container = document.getElementById('played-card-display');
 
-    // Track last action card played (only action type, not property or money)
-    if (card && card.type === 'action') {
+    // Track last action card played (only action type, not property or money, and not banked)
+    if (card && card.type === 'action' && !banked) {
       lastActionCard = card;
       renderDeckAndDiscard(ClientGame.getGameState());
     }
