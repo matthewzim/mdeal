@@ -8,31 +8,6 @@
 </head>
 <body>
 
-  <!-- ── Config Bar ──────────────────────────────────────────────── -->
-  <div class="config-bar">
-    <button onclick="document.getElementById('config-modal').classList.add('active')">Settings</button>
-  </div>
-
-  <!-- ── Config Modal ────────────────────────────────────────────── -->
-  <div id="config-modal">
-    <div class="config-box">
-      <h3>Supabase Configuration</h3>
-      <p style="font-size:0.8rem; opacity:0.7; margin-bottom:16px;">
-        Enter your Supabase project credentials. These are saved in localStorage.
-      </p>
-      <div class="input-group">
-        <label>Supabase URL</label>
-        <input type="text" id="config-url" placeholder="https://jonhtpjyllblmraocfvc.supabase.co">
-      </div>
-      <div class="input-group">
-        <label>Supabase Anon Key</label>
-        <input type="text" id="config-key" placeholder="sb_publishable_7wQfaSjNWBWUMQVSfV-sUA_zQ5QtYDF">
-      </div>
-      <button class="btn btn-primary" onclick="saveConfig()">Save & Connect</button>
-      <button class="btn btn-cancel" style="margin-top:8px" onclick="document.getElementById('config-modal').classList.remove('active')">Cancel</button>
-    </div>
-  </div>
-
   <!-- ── Loading Overlay ─────────────────────────────────────────── -->
   <div id="loading-overlay">
     <div class="spinner"></div>
@@ -190,32 +165,10 @@
 
   <!-- Init -->
   <script>
-    // Load config from localStorage
-    function loadConfig() {
-      const url = localStorage.getItem('supabase_url');
-      const key = localStorage.getItem('supabase_anon_key');
-      if (url) document.getElementById('config-url').value = url;
-      if (key) document.getElementById('config-key').value = key;
-      return { url, key };
-    }
-
-    function saveConfig() {
-      const url = document.getElementById('config-url').value.trim();
-      const key = document.getElementById('config-key').value.trim();
-      if (!url || !key) {
-        UI.showError('Both URL and Key are required');
-        return;
-      }
-      localStorage.setItem('supabase_url', url);
-      localStorage.setItem('supabase_anon_key', key);
-      document.getElementById('config-modal').classList.remove('active');
-      initApp(url, key);
-    }
-
-    async function initApp(url, key) {
+    async function initApp() {
       UI.init();
       try {
-        SupabaseClient.init(url, key);
+        SupabaseClient.init();
 
         // Try to restore session
         let session = await SupabaseClient.getSession();
@@ -232,14 +185,7 @@
     }
 
     // Boot
-    const { url, key } = loadConfig();
-    if (url && key) {
-      initApp(url, key);
-    } else {
-      // Show config modal on first load
-      document.getElementById('config-modal').classList.add('active');
-      UI.init();
-    }
+    initApp();
   </script>
 
 </body>

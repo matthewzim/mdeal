@@ -3,17 +3,15 @@
 
 const SupabaseClient = (() => {
   // ══════════════════════════════════════════════════════════════════════
-  // CONFIGURATION — Update these with your Supabase project credentials
+  // CONFIGURATION
   // ══════════════════════════════════════════════════════════════════════
-  let SUPABASE_URL = '';
-  let SUPABASE_ANON_KEY = '';
+  const SUPABASE_URL = 'https://jonhtpjyllblmraocfvc.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_7wQfaSjNWBWUMQVSfV-sUA_zQ5QtYDF';
   let supabase = null;
   let currentUser = null;
   let subscriptions = [];
 
-  function init(url, anonKey) {
-    SUPABASE_URL = url;
-    SUPABASE_ANON_KEY = anonKey;
+  function init() {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     return supabase;
   }
