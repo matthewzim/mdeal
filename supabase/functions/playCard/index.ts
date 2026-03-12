@@ -223,6 +223,9 @@ serve(async (req) => {
     if (action === 'bank') {
       const card = player.hand.find((c: any) => c.id === cardId);
       if (!card) return fail("Card not in hand");
+      if (card.type === 'property' || card.type === 'wild_property') {
+        return fail("Property cards cannot be banked");
+      }
       const removed = removeFromHand(player, cardId);
       player.bank.push(removed);
       state.turnPlaysRemaining--;

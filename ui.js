@@ -689,8 +689,10 @@ const UI = (() => {
 
     html += `<div class="action-buttons">`;
 
-    // Bank (any card)
-    html += `<button class="btn btn-bank" onclick="UI._doBank('${card.id}')">Bank (${card.value}M)</button>`;
+    // Bank (any card except properties)
+    if (card.type !== 'property' && card.type !== 'wild_property') {
+      html += `<button class="btn btn-bank" onclick="UI._doBank('${card.id}')">Bank (${card.value}M)</button>`;
+    }
 
     // Property
     if (card.type === 'property') {

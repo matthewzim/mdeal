@@ -111,7 +111,10 @@ const Rules = {
     if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
     const card = this.getCardFromHand(player, cardId);
     if (!card) return { valid: false, reason: 'Card not in hand' };
-    // Any card can be banked
+    // Property cards cannot be banked — they must be played as properties
+    if (card.type === CARD_TYPE.PROPERTY || card.type === CARD_TYPE.WILD_PROPERTY) {
+      return { valid: false, reason: 'Property cards cannot be banked' };
+    }
     return { valid: true };
   },
 

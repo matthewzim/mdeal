@@ -172,16 +172,20 @@ const GameEngine = {
   bankCard(state, playerId, cardId) {
     if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
-    const card = this.removeFromHand(player, cardId);
-    player.bank.push(card);
+    const card = player.hand.find(c => c.id === cardId);
+    if (card && (card.type === 'property' || card.type === 'wild_property')) {
+      return { error: 'Property cards cannot be banked' };
+    }
+    const removed = this.removeFromHand(player, cardId);
+    player.bank.push(removed);
     state.turnPlaysRemaining--;
     state.log.push({
       type: 'bank',
       player: playerId,
-      card: card.name,
-      value: card.value,
+      card: removed.name,
+      value: removed.value,
     });
-    return { card };
+    return { card: removed };
   },
 
   playPassGo(state, playerId, cardId) {
