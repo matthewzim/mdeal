@@ -434,6 +434,7 @@ html, body {
 
 #opponent-top {
   grid-area: top;
+  padding-bottom: 2px;
 }
 
 #opponent-left {
@@ -564,7 +565,11 @@ html, body {
 /* Top opponent: shrink card area */
 #opponent-top .opponent-card-area {
   transform: scale(0.75);
-  transform-origin: center center;
+  transform-origin: top center;
+}
+
+#opponent-top .opponent-header {
+  margin-bottom: 0;
 }
 
 /* Top opponent: two-row layout (cash | properties) */
