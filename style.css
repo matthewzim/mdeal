@@ -760,7 +760,7 @@ html, body {
 
 /* Top opponent: center card area */
 #opponent-top .opponent-card-area {
-  align-items: center;
+  align-items: stretch;
 }
 
 #opponent-top .opponent-row {
@@ -776,9 +776,10 @@ html, body {
 }
 
 #opponent-top .opponent-header {
-  margin-bottom: 0;
+  margin: 0 auto;
   justify-content: center;
   text-align: center;
+  width: fit-content;
 }
 
 #opponent-top .opponent-info {
@@ -793,7 +794,7 @@ html, body {
   justify-content: center;
 }
 
-/* Top opponent: two-row layout (cash | properties) */
+/* Top opponent: two-row layout (cash above properties) */
 .opponent-card-area--rows {
   display: flex !important;
   flex-direction: column;
@@ -804,6 +805,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
 }
 
 .opponent-row-label {
@@ -817,6 +819,9 @@ html, body {
 
 .opponent-row--cash .opponent-bank {
   margin-bottom: 0;
+  min-height: 62px;
+  align-items: center;
+  align-content: center;
 }
 
 /* In rows layout, prop groups stack label on top of cards */
