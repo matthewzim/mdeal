@@ -406,9 +406,13 @@ const ClientGame = (() => {
       drawCards: () => localDrawCards(),
       playProperty: (cardId, chosenColor) => localPlayProperty(cardId, chosenColor),
       playPassGo: (cardId) => localPlayPassGo(cardId),
-      playRent: (cardId, color) => localPlayRent(cardId, color),
+      playRent: (cardId, color, doubleCardId) => localPlayRent(cardId, color, doubleCardId),
       playDebtCollector: (cardId, targetId) => localPlayDebtCollector(cardId, targetId),
       playBirthday: (cardId) => localPlayBirthday(cardId),
+      playSlyDeal: (cardId, targetId, targetCardId) => localPlaySlyDeal(cardId, targetId, targetCardId),
+      playForcedDeal: (cardId, targetId, targetCardId, myCardId) => localPlayForcedDeal(cardId, targetId, targetCardId, myCardId),
+      playDealBreaker: (cardId, targetId, targetColor) => localPlayDealBreaker(cardId, targetId, targetColor),
+      moveWild: (cardId, chosenColor) => localMoveWild(cardId, chosenColor),
       bankCard: (cardId) => localBankCard(cardId),
       endTurn: (discardIds) => localEndTurn(discardIds),
       respondAccept: () => localRespondAccept(),
@@ -444,9 +448,10 @@ const ClientGame = (() => {
     renderLocalGame();
   }
 
-  function localPlayRent(cardId, color) {
+  function localPlayRent(cardId, color, doubleCardId) {
     _showCardBeforePlay(cardId);
-    GameEngine.playRent(gameState, gameState.currentPlayer, cardId, color, null);
+    if (doubleCardId) _showCardBeforePlay(doubleCardId);
+    GameEngine.playRent(gameState, gameState.currentPlayer, cardId, color, doubleCardId || null);
     renderLocalGame();
   }
 
@@ -459,6 +464,29 @@ const ClientGame = (() => {
   function localPlayBirthday(cardId) {
     _showCardBeforePlay(cardId);
     GameEngine.playBirthday(gameState, gameState.currentPlayer, cardId);
+    renderLocalGame();
+  }
+
+  function localPlaySlyDeal(cardId, targetId, targetCardId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playSlyDeal(gameState, gameState.currentPlayer, cardId, targetId, targetCardId);
+    renderLocalGame();
+  }
+
+  function localPlayForcedDeal(cardId, targetId, targetCardId, myCardId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playForcedDeal(gameState, gameState.currentPlayer, cardId, targetId, targetCardId, myCardId);
+    renderLocalGame();
+  }
+
+  function localPlayDealBreaker(cardId, targetId, targetColor) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playDealBreaker(gameState, gameState.currentPlayer, cardId, targetId, targetColor);
+    renderLocalGame();
+  }
+
+  function localMoveWild(cardId, chosenColor) {
+    GameEngine.moveWild(gameState, gameState.currentPlayer, cardId, chosenColor);
     renderLocalGame();
   }
 
