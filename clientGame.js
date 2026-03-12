@@ -422,13 +422,13 @@ const ClientGame = (() => {
     renderLocalGame();
   }
 
-  function _showCardBeforePlay(cardId) {
+  function _showCardBeforePlay(cardId, banked) {
     const player = gameState.players.find(p => p.id === gameState.currentPlayer);
     if (!player) return;
     const card = player.hand.find(c => c.id === cardId);
     if (card) {
       const name = playerNames[gameState.currentPlayer] || 'Unknown';
-      UI.showPlayedCard(card, name);
+      UI.showPlayedCard(card, name, banked);
     }
   }
 
@@ -463,7 +463,7 @@ const ClientGame = (() => {
   }
 
   function localBankCard(cardId) {
-    _showCardBeforePlay(cardId);
+    _showCardBeforePlay(cardId, true);
     GameEngine.bankCard(gameState, gameState.currentPlayer, cardId);
     renderLocalGame();
   }
