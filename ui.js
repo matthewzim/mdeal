@@ -789,18 +789,21 @@ const UI = (() => {
       // Show status only
       if (isInitiator) {
         overlay.style.display = 'flex';
+        const waitTitle = describeActionTitle(pending);
         overlay.innerHTML = `
           <div class="action-modal">
-            <h3>Waiting for Response</h3>
+            <h3>${waitTitle} — Waiting</h3>
             <p>Waiting for ${escapeHtml(names[pending.currentResponder] || names[pending.currentPayer] || 'opponent')}...</p>
           </div>
         `;
       } else {
         overlay.style.display = 'flex';
+        const actionTitle = describeActionTitle(pending);
+        const actionDetail = describeActionSummary(pending, names);
         overlay.innerHTML = `
           <div class="action-modal">
-            <h3>Action in Progress</h3>
-            <p>${escapeHtml(names[pending.from] || 'Someone')} played an action...</p>
+            <h3>${actionTitle}</h3>
+            <p>${actionDetail}</p>
           </div>
         `;
       }
@@ -852,6 +855,31 @@ const UI = (() => {
       case 'forced_deal': return `${n(pending.from)} wants to swap properties with you!`;
       case 'deal_breaker': return `${n(pending.from)} wants to steal your complete ${COLOR_LABELS[pending.targetColor] || pending.targetColor} set!`;
       default: return `${n(pending.from)} played an action against you.`;
+    }
+  }
+
+  function describeActionTitle(pending) {
+    switch (pending.type) {
+      case 'rent': return pending.doubled ? 'Double Rent!' : 'Rent';
+      case 'debt_collector': return 'Debt Collector';
+      case 'birthday': return "It's My Birthday";
+      case 'sly_deal': return 'Sly Deal';
+      case 'forced_deal': return 'Forced Deal';
+      case 'deal_breaker': return 'Deal Breaker';
+      default: return 'Action in Progress';
+    }
+  }
+
+  function describeActionSummary(pending, names) {
+    const n = (id) => escapeHtml(names[id] || 'Someone');
+    switch (pending.type) {
+      case 'rent': return `${n(pending.from)} charged ${pending.amount}M rent for ${COLOR_LABELS[pending.color] || pending.color}${pending.doubled ? ' (doubled!)' : ''}`;
+      case 'debt_collector': return `${n(pending.from)} played Debt Collector — collecting 5M`;
+      case 'birthday': return `${n(pending.from)} played It's My Birthday — collecting 2M from everyone`;
+      case 'sly_deal': return `${n(pending.from)} is stealing a property`;
+      case 'forced_deal': return `${n(pending.from)} is swapping properties`;
+      case 'deal_breaker': return `${n(pending.from)} is stealing a complete ${COLOR_LABELS[pending.targetColor] || pending.targetColor} set`;
+      default: return `${n(pending.from)} played an action`;
     }
   }
 
