@@ -445,6 +445,32 @@ html, body {
   grid-area: right;
 }
 
+/* Right opponent: right-align header and put cash on the right */
+#opponent-right .opponent-header {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+#opponent-right .opponent-stats {
+  justify-content: flex-end;
+}
+
+#opponent-right .opponent-card-area--columns {
+  grid-template-columns: 1fr 1fr auto !important;
+}
+
+#opponent-right .opponent-column--cash {
+  order: 3;
+}
+
+#opponent-right .opponent-column--properties:nth-child(2) {
+  order: 1;
+}
+
+#opponent-right .opponent-column--properties:nth-child(3) {
+  order: 2;
+}
+
 #opponent-top-left {
   grid-area: top-left;
 }
@@ -562,14 +588,41 @@ html, body {
   width: 100%;
 }
 
-/* Top opponent: shrink card area */
+/* Top opponent: shrink card area and center it */
 #opponent-top .opponent-card-area {
   transform: scale(0.75);
   transform-origin: top center;
+  align-items: center;
+}
+
+#opponent-top .opponent-row {
+  align-items: center;
+}
+
+#opponent-top .opponent-bank {
+  justify-content: center;
+}
+
+#opponent-top .opponent-properties {
+  justify-content: center;
 }
 
 #opponent-top .opponent-header {
   margin-bottom: 0;
+  justify-content: center;
+  text-align: center;
+}
+
+#opponent-top .opponent-info {
+  flex: none;
+}
+
+#opponent-top .opponent-name {
+  text-align: center;
+}
+
+#opponent-top .opponent-stats {
+  justify-content: center;
 }
 
 /* Top opponent: two-row layout (cash | properties) */
