@@ -408,7 +408,7 @@ html, body {
 .game-table {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr 260px 260px;
+  grid-template-columns: 420px 1fr 420px 260px;
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "top-left  top       .          game-info"
@@ -518,7 +518,7 @@ html, body {
 /* Left/Right opponents: two-column layout (cash | properties) */
 .opponent-card-area--columns {
   display: grid !important;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: auto 1fr 1fr;
   gap: 8px;
   flex: 1;
   min-height: 0;
@@ -543,8 +543,8 @@ html, body {
 }
 
 .opponent-column--cash .opponent-bank {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
