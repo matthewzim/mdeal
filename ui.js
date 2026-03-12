@@ -1164,7 +1164,7 @@ const UI = (() => {
     'Rent: Brown/Lightblue': 'rent-brown-and-light-blue.png',
     'Rent: Pink/Orange': 'rent-pink-and-orange.png',
     'Rent: Red/Yellow': 'rent-red-and-yellow.png',
-    'Rent: Darkblue/Green': 'rent-dark-blue-and-green.png',
+    'Rent: Darkblue/Green': 'rent-green-and-dark-blue.png',
     'Rent: Railroad/Utility': 'rent-black-and-utility.png',
     'Multi Rent (Wild)': 'rent-all-colours.png',
   };
@@ -1173,7 +1173,7 @@ const UI = (() => {
     'brown,lightblue': 'rent-brown-and-light-blue.png',
     'pink,orange': 'rent-pink-and-orange.png',
     'red,yellow': 'rent-red-and-yellow.png',
-    'darkblue,green': 'rent-dark-blue-and-green.png',
+    'darkblue,green': 'rent-green-and-dark-blue.png',
     'railroad,utility': 'rent-black-and-utility.png',
   };
 
