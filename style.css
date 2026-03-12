@@ -1196,7 +1196,8 @@ html, body {
 #chat-panel {
   display: none;
   flex-direction: column;
-  flex: 1;
+  height: 250px;
+  max-height: 250px;
   min-height: 0;
   background: rgba(0,0,0,0.3);
   border-radius: 8px;
@@ -1217,7 +1218,7 @@ html, body {
 }
 
 #chat-messages {
-  flex: 1;
+  flex: 1 1 0;
   overflow-y: auto;
   min-height: 0;
   margin-bottom: 6px;
