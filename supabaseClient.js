@@ -274,6 +274,24 @@ const SupabaseClient = (() => {
     return (rooms || []).filter(r => (r.room_players || []).length < 4);
   }
 
+  async function getOnlinePlayerCount() {
+    const { data: rooms, error } = await supabase
+      .from('rooms')
+      .select('room_players(player_id)')
+      .in('status', ['waiting', 'playing']);
+    if (error) {
+      console.error('Failed to get online player count:', error);
+      return 0;
+    }
+    const playerIds = new Set();
+    for (const room of rooms || []) {
+      for (const rp of room.room_players || []) {
+        playerIds.add(rp.player_id);
+      }
+    }
+    return playerIds.size;
+  }
+
   // ── Realtime ─────────────────────────────────────────────────────────
 
   function subscribeToRoom(roomId, onRoomChange) {
@@ -340,7 +358,7 @@ const SupabaseClient = (() => {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
     createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
     setReady, getRoomByCode, getRoomPlayers, getGame, getPlayerName,
-    getPublicRooms,
+    getPublicRooms, getOnlinePlayerCount,
     subscribeToRoom, subscribeToGame, unsubscribeAll,
     subscribeToChatChannel, sendChatMessage,
   };
