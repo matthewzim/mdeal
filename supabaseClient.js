@@ -10,11 +10,18 @@ const SupabaseClient = (() => {
   let supabase = null;
   let currentUser = null;
   let subscriptions = [];
+  let authReady = false;
+  let authReadyPromise = null;
+  let authReadyResolve = null;
 
   function init() {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    authReadyPromise = new Promise((resolve) => { authReadyResolve = resolve; });
     return supabase;
   }
+
+  function isAuthReady() { return authReady; }
+  function waitForAuth() { return authReadyPromise; }
 
   function getClient() {
     return supabase;
@@ -23,41 +30,74 @@ const SupabaseClient = (() => {
   // ── Auth ──────────────────────────────────────────────────────────────
 
   async function signInAnonymously() {
-    // Try anonymous sign-in first
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (!error) {
-      currentUser = data.user;
-      return data;
-    }
-
-    // If anonymous sign-ins are disabled, fall back to auto-generated account
-    const storedId = localStorage.getItem('mdeal_auto_user_id');
-    if (storedId) {
-      // Try to sign in with existing auto-generated credentials
-      const email = `${storedId}@mdeal.local`;
-      const password = storedId;
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (!signInError) {
-        currentUser = signInData.user;
-        return signInData;
+    try {
+      // Try anonymous sign-in first
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (!error && data.session) {
+        currentUser = data.user;
+        authReady = true;
+        if (authReadyResolve) authReadyResolve();
+        return data;
       }
-    }
 
-    // Create a new auto-generated account
-    const userId = crypto.randomUUID();
-    const email = `${userId}@mdeal.local`;
-    const password = userId;
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) throw signUpError;
-    localStorage.setItem('mdeal_auto_user_id', userId);
-    currentUser = signUpData.user;
-    return signUpData;
+      // If anonymous sign-ins are disabled, fall back to auto-generated account
+      const storedId = localStorage.getItem('mdeal_auto_user_id');
+      if (storedId) {
+        // Try to sign in with existing auto-generated credentials
+        const email = `${storedId}@mdeal.local`;
+        const password = storedId;
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (!signInError && signInData.session) {
+          currentUser = signInData.user;
+          authReady = true;
+          if (authReadyResolve) authReadyResolve();
+          return signInData;
+        }
+      }
+
+      // Create a new auto-generated account
+      const userId = crypto.randomUUID();
+      const email = `${userId}@mdeal.local`;
+      const password = userId;
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { auto_generated: true } },
+      });
+      if (signUpError) throw signUpError;
+
+      // If sign-up didn't return a session (email confirmation required),
+      // immediately sign in with the credentials we just created.
+      if (!signUpData.session) {
+        const { data: freshLogin, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginErr) throw loginErr;
+        localStorage.setItem('mdeal_auto_user_id', userId);
+        currentUser = freshLogin.user;
+        authReady = true;
+        if (authReadyResolve) authReadyResolve();
+        return freshLogin;
+      }
+
+      localStorage.setItem('mdeal_auto_user_id', userId);
+      currentUser = signUpData.user;
+      authReady = true;
+      if (authReadyResolve) authReadyResolve();
+      return signUpData;
+    } catch (err) {
+      authReady = true; // unblock callers even on failure
+      if (authReadyResolve) authReadyResolve();
+      throw err;
+    }
   }
 
   async function getSession() {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       currentUser = session.user;
+      if (!authReady) {
+        authReady = true;
+        if (authReadyResolve) authReadyResolve();
+      }
     }
     return session;
   }
@@ -96,6 +136,12 @@ const SupabaseClient = (() => {
   // ── Edge Function calls ──────────────────────────────────────────────
 
   async function callFunction(name, body) {
+    // Wait for initial auth to complete before making any Edge Function call.
+    // This prevents "Invalid JWT" errors caused by calling before sign-in finishes.
+    if (!authReady && authReadyPromise) {
+      await authReadyPromise;
+    }
+
     // Use fetch directly instead of supabase.functions.invoke() so we have
     // full control over response parsing and can surface real error messages
     // instead of the generic "Edge Function returned a non-2xx status code".
@@ -338,6 +384,7 @@ const SupabaseClient = (() => {
 
   return {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
+    isAuthReady, waitForAuth,
     createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
     setReady, getRoomByCode, getRoomPlayers, getGame, getPlayerName,
     getPublicRooms,
