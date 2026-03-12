@@ -282,12 +282,15 @@ const UI = (() => {
               <div class="opponent-properties">${propsHtml2}</div>
             </div>
           </div>`
-        : `<div class="opponent-card-area">
-            <div class="opponent-cards">
-              ${Array(cardCount).fill('<div class="card card-back mini"></div>').join('')}
+        : `<div class="opponent-card-area opponent-card-area--rows">
+            <div class="opponent-row opponent-row--cash">
+              <div class="opponent-row-label">Cash</div>
+              <div class="opponent-bank">${bankHtml}</div>
             </div>
-            <div class="opponent-bank">${bankHtml}</div>
-            <div class="opponent-properties">${propsHtml}</div>
+            <div class="opponent-row opponent-row--properties">
+              <div class="opponent-row-label">Properties</div>
+              <div class="opponent-properties">${propsHtml}</div>
+            </div>
           </div>`;
 
       el.innerHTML = `
@@ -298,7 +301,7 @@ const UI = (() => {
           <div class="opponent-info">
             <div class="opponent-name">${escapeHtml(name)}</div>
             <div class="opponent-stats">
-              <span class="stat">Cards: ${cardCount}</span>
+              ${isSide ? `<span class="stat">Cards: ${cardCount}</span>` : ''}
               <span class="stat">Bank: ${bankValue}M</span>
               <span class="stat">Sets: ${completedSets}/3</span>
             </div>
