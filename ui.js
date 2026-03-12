@@ -227,8 +227,20 @@ const UI = (() => {
       });
     });
 
-    // Load public games on init
+    // Load public games and player count on init
     refreshPublicGames();
+    refreshOnlinePlayerCount();
+    setInterval(refreshOnlinePlayerCount, 15000);
+  }
+
+  async function refreshOnlinePlayerCount() {
+    try {
+      const count = await SupabaseClient.getOnlinePlayerCount();
+      const el = document.getElementById('online-player-count');
+      if (el) el.textContent = count + ' Player' + (count !== 1 ? 's' : '') + ' Online';
+    } catch (err) {
+      console.error('Failed to refresh online player count:', err);
+    }
   }
 
   function updateLobbyRoomCodeVisibility(isPublic, roomCode) {
