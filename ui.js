@@ -399,7 +399,7 @@ const UI = (() => {
   }
 
   function renderOpponents(opponents, names, state) {
-    const positions = ['top', 'left', 'right', 'top-left']; // up to 4 opponents
+    const positions = ['left', 'top', 'right', 'top-left']; // clockwise: main → left → top → right
     // Clear all opponent seats
     for (const pos of positions) {
       const el = document.getElementById('opponent-' + pos);
