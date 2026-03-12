@@ -974,6 +974,7 @@ html, body {
 #my-properties {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   padding: 8px;
   background: rgba(0,0,0,0.15);
@@ -1127,6 +1128,7 @@ html, body {
   padding: 8px;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
   align-items: flex-start;
   min-height: 90px;
