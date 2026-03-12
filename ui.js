@@ -251,6 +251,22 @@ const UI = (() => {
         return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
       }).join('');
 
+      // Split property groups into two columns for side opponents
+      const propGroupEntries = Object.entries(propGroups);
+      const propMid = Math.ceil(propGroupEntries.length / 2);
+      let propsHtml1 = '';
+      let propsHtml2 = '';
+      propGroupEntries.forEach(([color, cards], idx) => {
+        let groupHtml = `<div class="prop-group">`;
+        groupHtml += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
+        for (const card of cards) {
+          groupHtml += createMiniPropertyCard(card);
+        }
+        groupHtml += `</div>`;
+        if (idx < propMid) propsHtml1 += groupHtml;
+        else propsHtml2 += groupHtml;
+      });
+
       const cardAreaHtml = isSide
         ? `<div class="opponent-card-area opponent-card-area--columns">
             <div class="opponent-column opponent-column--cash">
@@ -259,7 +275,11 @@ const UI = (() => {
             </div>
             <div class="opponent-column opponent-column--properties">
               <div class="opponent-column-label">Properties</div>
-              <div class="opponent-properties">${propsHtml}</div>
+              <div class="opponent-properties">${propsHtml1}</div>
+            </div>
+            <div class="opponent-column opponent-column--properties">
+              <div class="opponent-column-label">Properties</div>
+              <div class="opponent-properties">${propsHtml2}</div>
             </div>
           </div>`
         : `<div class="opponent-card-area">

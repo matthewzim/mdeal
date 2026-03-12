@@ -518,7 +518,7 @@ html, body {
 /* Left/Right opponents: two-column layout (cash | properties) */
 .opponent-card-area--columns {
   display: grid !important;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   flex: 1;
   min-height: 0;
