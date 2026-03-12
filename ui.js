@@ -32,6 +32,115 @@ const UI = (() => {
   let playedCardCleanTimeout = null;
   let lastActionCard = null; // track the last action card played (for center display)
 
+  // ── Turn timer (online play only) ──────────────────────────────────
+  const TIMER_DURATION = 30; // seconds per move
+  const TIMER_CIRCUMFERENCE = 2 * Math.PI * 26; // matches SVG circle r=26
+  let timerInterval = null;
+  let timerSecondsLeft = TIMER_DURATION;
+  let timerActive = false;
+
+  function startTimer(state, myId) {
+    stopTimer();
+
+    // Only run timer in online play and when it's my turn
+    if (ClientGame.isComputerGame()) {
+      hideTimer();
+      return;
+    }
+
+    const isMyTurn = state.currentPlayer === myId;
+    const phase = state.phase;
+
+    // Only show timer for actionable phases on my turn
+    if (!isMyTurn || (phase !== 'draw' && phase !== 'play' && phase !== 'discard')) {
+      hideTimer();
+      return;
+    }
+
+    timerSecondsLeft = TIMER_DURATION;
+    timerActive = true;
+    showTimer();
+    updateTimerDisplay();
+
+    timerInterval = setInterval(() => {
+      timerSecondsLeft--;
+      updateTimerDisplay();
+
+      if (timerSecondsLeft <= 0) {
+        stopTimer();
+        handleTimerExpired(phase);
+      }
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    timerActive = false;
+  }
+
+  function showTimer() {
+    const el = document.getElementById('turn-timer');
+    if (el) el.style.display = 'flex';
+  }
+
+  function hideTimer() {
+    const el = document.getElementById('turn-timer');
+    if (el) el.style.display = 'none';
+    stopTimer();
+  }
+
+  function updateTimerDisplay() {
+    const textEl = document.getElementById('timer-text');
+    const progressEl = document.querySelector('.timer-ring-progress');
+    const containerEl = document.getElementById('turn-timer');
+    if (!textEl || !progressEl || !containerEl) return;
+
+    const secs = Math.max(0, timerSecondsLeft);
+    textEl.textContent = '0:' + String(secs).padStart(2, '0');
+
+    // Update circular progress
+    const fraction = secs / TIMER_DURATION;
+    const offset = TIMER_CIRCUMFERENCE * (1 - fraction);
+    progressEl.style.strokeDashoffset = offset;
+
+    // Color states
+    containerEl.classList.remove('warning', 'critical');
+    if (secs <= 5) {
+      containerEl.classList.add('critical');
+    } else if (secs <= 10) {
+      containerEl.classList.add('warning');
+    }
+  }
+
+  async function handleTimerExpired(phase) {
+    if (phase === 'draw') {
+      // Auto-draw cards
+      await ClientGame.drawCards();
+    } else if (phase === 'play' || phase === 'discard') {
+      // Auto-end turn (for discard, end without discarding will re-prompt or server handles it)
+      if (phase === 'discard') {
+        // Select random cards to discard if needed
+        const state = ClientGame.getGameState();
+        const myId = ClientGame.getPlayerId();
+        if (state) {
+          const player = state.players.find(p => p.id === myId);
+          if (player) {
+            const excess = player.hand.length - 7;
+            if (excess > 0) {
+              const discardIds = player.hand.slice(0, excess).map(c => c.id);
+              await ClientGame.endTurn(discardIds);
+              return;
+            }
+          }
+        }
+      }
+      await ClientGame.endTurn();
+    }
+  }
+
   // ── Screen management ────────────────────────────────────────────────
 
   function showScreen(screenId) {
@@ -279,8 +388,12 @@ const UI = (() => {
     // Render pending action UI
     renderPendingAction(state, myId, names);
 
+    // Start/restart turn timer (online play only)
+    startTimer(state, myId);
+
     // Check winner
     if (state.phase === 'finished' && state.winner) {
+      hideTimer();
       showWinner(state.winner, names);
     }
   }
