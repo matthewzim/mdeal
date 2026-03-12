@@ -172,7 +172,7 @@ const ClientGame = (() => {
       const result = await SupabaseClient.playCard(gameId, 'draw');
       if (result.state) {
         gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
+        UI.renderGame(gameState, playerId, playerNames, { animateHand: true });
       }
       if (result.drawnCards) {
         UI.showDrawnCards(result.drawnCards);
@@ -381,10 +381,10 @@ const ClientGame = (() => {
     renderLocalGame();
   }
 
-  function renderLocalGame() {
+  function renderLocalGame(options) {
     // Show the human player's view (hide other hands)
     const view = GameEngine.getPlayerView(gameState, playerId);
-    UI.renderGame(view, playerId, playerNames);
+    UI.renderGame(view, playerId, playerNames, options);
     // After rendering, check if a computer needs to act
     scheduleComputerAction();
   }
@@ -439,7 +439,7 @@ const ClientGame = (() => {
 
   function localDrawCards() {
     GameEngine.startTurn(gameState);
-    renderLocalGame();
+    renderLocalGame({ animateHand: true });
   }
 
   function _showCardBeforePlay(cardId, banked) {

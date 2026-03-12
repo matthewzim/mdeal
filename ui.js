@@ -239,7 +239,7 @@ const UI = (() => {
 
   // ── Game rendering ───────────────────────────────────────────────────
 
-  function renderGame(state, myId, names) {
+  function renderGame(state, myId, names, options) {
     if (!state || !state.players) return;
 
     const myPlayer = state.players.find(p => p.id === myId);
@@ -248,8 +248,9 @@ const UI = (() => {
     // Render opponents in seats
     renderOpponents(opponents, names, state);
 
-    // Render my hand
-    renderMyHand(myPlayer, state);
+    // Render my hand (only animate on draw)
+    const animateHand = options && options.animateHand;
+    renderMyHand(myPlayer, state, false, animateHand);
 
     // Render my properties
     renderMyProperties(myPlayer, state, myId);
@@ -386,7 +387,7 @@ const UI = (() => {
     });
   }
 
-  function renderMyHand(player, state, forceRender) {
+  function renderMyHand(player, state, forceRender, animate) {
     const container = document.getElementById('my-hand');
 
     if (!player || !player.hand) {
@@ -408,8 +409,10 @@ const UI = (() => {
     player.hand.forEach((card, i) => {
       if (card.type === 'hidden') return;
       const el = createCardElement(card, true);
-      el.style.animationDelay = (i * 0.05) + 's';
-      el.classList.add('hand-card');
+      if (animate) {
+        el.style.animationDelay = (i * 0.05) + 's';
+        el.classList.add('hand-card');
+      }
 
       if (discardMode) {
         el.addEventListener('click', () => toggleDiscardSelect(card.id, el));
