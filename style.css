@@ -1270,8 +1270,8 @@ html, body {
 #chat-panel {
   display: none;
   flex-direction: column;
-  height: 350px;
-  max-height: 350px;
+  height: 270px;
+  max-height: 270px;
   min-height: 0;
   background: rgba(0,0,0,0.3);
   border-radius: 8px;
