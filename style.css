@@ -1045,16 +1045,12 @@ html, body {
 }
 
 .my-prop-label {
-  font-size: 0.75rem;
-  padding: 3px 8px;
-  border-radius: 4px;
-  border-left: 4px solid;
+  height: 6px;
+  border-radius: 3px;
   margin-bottom: 4px;
-  background: rgba(0,0,0,0.2);
 }
 
 .my-prop-label.complete {
-  background: rgba(46, 204, 113, 0.2);
   font-weight: bold;
 }
 
