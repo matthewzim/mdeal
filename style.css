@@ -570,12 +570,13 @@ html, body {
   flex: 1;
   display: grid;
   grid-template-columns: 420px 1fr 420px 260px;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto auto;
   grid-template-areas:
     "top-left  top-left  top-left   game-info"
     "top       top       top        game-info"
     "left      center    right      game-info"
-    "my-bank   my-hand   my-props   game-info";
+    "my-bank   my-bank   my-props   game-info"
+    "my-hand   my-hand   my-hand    game-info";
   gap: 8px;
   padding: 8px;
   min-height: 100%;
@@ -1786,8 +1787,8 @@ html, body {
       "game-info"
       "center"
       "my-bank"
-      "my-hand"
-      "my-props";
+      "my-props"
+      "my-hand";
   }
 
   #opponent-left, #opponent-right {
