@@ -84,7 +84,7 @@ html, body {
 }
 
 .input-group {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .input-group input {
@@ -297,6 +297,7 @@ html, body {
   gap: 12px;
   align-items: center;
   width: 100%;
+  margin-bottom: 20px;
 }
 
 .create-room-row .btn-create {
@@ -361,7 +362,7 @@ html, body {
 /* ── Public Games List ────────────────────────────────────────────── */
 
 #public-games-section {
-  margin-bottom: 4px;
+  margin-bottom: 20px;
 }
 
 .public-games-heading {
