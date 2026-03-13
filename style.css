@@ -570,13 +570,12 @@ html, body {
   flex: 1;
   display: grid;
   grid-template-columns: 420px 1fr 420px 260px;
-  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-rows: auto auto 1fr auto;
   grid-template-areas:
     "top-left  top-left  top-left   game-info"
     "top       top       top        game-info"
     "left      center    right      game-info"
-    "my-area   my-area   my-area    game-info"
-    "hand      hand      hand       game-info";
+    "my-bank   my-hand   my-props   game-info";
   gap: 8px;
   padding: 8px;
   min-height: 100%;
@@ -978,11 +977,21 @@ html, body {
 
 /* ── My Play Area (properties + bank, above hand) ─────────────────── */
 
-.my-play-area {
-  grid-area: my-area;
+.my-bank-area {
+  grid-area: my-bank;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 8px;
+}
+
+.my-props-area {
+  grid-area: my-props;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
   padding: 8px;
 }
 
@@ -990,7 +999,7 @@ html, body {
 #my-properties {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: 8px;
   background: rgba(0,0,0,0.15);
@@ -1144,7 +1153,7 @@ html, body {
   padding: 8px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 6px;
   align-items: flex-start;
   min-height: 90px;
@@ -1156,6 +1165,7 @@ html, body {
   color: var(--accent-green);
   margin-right: 8px;
   width: 100%;
+  text-align: right;
 }
 
 .bank-card {
@@ -1328,10 +1338,11 @@ html, body {
 /* ── Player Hand ───────────────────────────────────────────────────── */
 
 .hand-area {
-  grid-area: hand;
+  grid-area: my-hand;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   padding: 8px;
 }
 
@@ -1774,9 +1785,9 @@ html, body {
       "top"
       "game-info"
       "center"
-      "my-area"
-      "hand"
-      "left";
+      "my-bank"
+      "my-hand"
+      "my-props";
   }
 
   #opponent-left, #opponent-right {
