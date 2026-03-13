@@ -75,16 +75,32 @@ const Rules = {
     return this.bankTotal(player) + this.propertyTotal(player);
   },
 
-  // Rent for a given color
+  // Count houses/hotels on a given color set
+  countHousesOnColor(player, color) {
+    return player.properties.filter(c => c.actionType === ACTION_TYPE.HOUSE && c.attachedColor === color).length;
+  },
+
+  countHotelsOnColor(player, color) {
+    return player.properties.filter(c => c.actionType === ACTION_TYPE.HOTEL && c.attachedColor === color).length;
+  },
+
+  // Rent for a given color (includes house/hotel bonuses)
   rentAmount(player, color) {
     const count = this.countColor(player, color);
     const table = RENT_VALUES[color];
     if (!table || count === 0) return 0;
-    return table[Math.min(count, table.length) - 1];
+    let rent = table[Math.min(count, table.length) - 1];
+    // Add house bonus (3M each) and hotel bonus (4M each)
+    rent += this.countHousesOnColor(player, color) * 3;
+    rent += this.countHotelsOnColor(player, color) * 4;
+    return rent;
   },
 
   // Is a property part of a completed set?
   isInCompletedSet(player, card) {
+    if (card.actionType === ACTION_TYPE.HOUSE || card.actionType === ACTION_TYPE.HOTEL) {
+      return card.attachedColor ? this.isSetComplete(player, card.attachedColor) : false;
+    }
     const color = card.type === CARD_TYPE.WILD_PROPERTY ? card.currentColor : card.color;
     return this.isSetComplete(player, color);
   },
@@ -302,6 +318,28 @@ const Rules = {
     // Cannot move out of a completed set
     if (this.isInCompletedSet(player, card)) {
       return { valid: false, reason: 'Cannot move wild from completed set' };
+    }
+    return { valid: true };
+  },
+
+  validatePlayHouseHotel(state, playerId, cardId, targetColor) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.HOUSE && card.actionType !== ACTION_TYPE.HOTEL) {
+      return { valid: false, reason: 'Not a House or Hotel card' };
+    }
+    if (!targetColor) return { valid: false, reason: 'Must specify a target color' };
+    // Cannot add to railroad or utility sets
+    if (targetColor === COLORS.RAILROAD || targetColor === COLORS.UTILITY) {
+      return { valid: false, reason: 'Cannot add houses/hotels to railroad or utility sets' };
+    }
+    // Must be a complete set
+    if (!this.isSetComplete(player, targetColor)) {
+      return { valid: false, reason: 'Can only add to a complete property set' };
     }
     return { valid: true };
   },

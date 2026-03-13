@@ -77,6 +77,9 @@ const ComputerPlayer = (() => {
 
   // Check if a property card is part of a completed set
   function isInCompletedSet(player, card) {
+    if (card.actionType === 'house' || card.actionType === 'hotel') {
+      return card.attachedColor ? isSetComplete(player, card.attachedColor) : false;
+    }
     const color = card.type === 'wild_property' ? card.currentColor : card.color;
     return isSetComplete(player, color);
   }
@@ -353,6 +356,26 @@ const ComputerPlayer = (() => {
         callbacks.playProperty(propPlay.card.id);
       }
       return;
+    }
+
+    // Priority 3b: Play house/hotel cards onto complete sets
+    const houseHotelCard = player.hand.find(c => c.actionType === 'house' || c.actionType === 'hotel');
+    if (houseHotelCard) {
+      const eligibleSets = getCompletedSets(player).filter(c => c !== 'railroad' && c !== 'utility');
+      if (eligibleSets.length > 0) {
+        // Pick the set with the highest base rent to maximize benefit
+        let bestColor = eligibleSets[0];
+        let bestRent = rentAmount(player, eligibleSets[0]);
+        for (const color of eligibleSets.slice(1)) {
+          const r = rentAmount(player, color);
+          if (r > bestRent) {
+            bestRent = r;
+            bestColor = color;
+          }
+        }
+        callbacks.playHouseHotel(houseHotelCard.id, bestColor);
+        return;
+      }
     }
 
     // Priority 4: Deal Breaker to steal a completed set (even if not winning)
@@ -886,6 +909,11 @@ const ComputerPlayer = (() => {
     if (card.actionType === 'sly_deal') return 80;
     if (card.actionType === 'forced_deal') return 70;
     if (card.actionType === 'double_rent') return 65;
+    if (card.actionType === 'house' || card.actionType === 'hotel') {
+      // Valuable if we have eligible complete sets
+      const eligible = getCompletedSets(player).filter(c => c !== 'railroad' && c !== 'utility');
+      return eligible.length > 0 ? 75 : 15;
+    }
 
     // Properties that advance sets are valuable
     if (card.type === 'property') {
