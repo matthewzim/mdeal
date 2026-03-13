@@ -923,7 +923,7 @@ html, body {
 
 #deck-and-discard {
   position: absolute;
-  right: 32px;
+  right: 48px;
   top: 0;
   bottom: 0;
   display: flex;
