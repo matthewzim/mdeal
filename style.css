@@ -1039,7 +1039,7 @@ html, body {
 }
 
 .my-prop-group {
-  min-width: 80px;
+  min-width: 50px;
 }
 
 .my-prop-label {
@@ -1056,6 +1056,17 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.my-prop-cards--stacked {
+  position: relative;
+  width: 42px;
+  display: block;
+}
+
+.my-prop-cards--stacked .card-image-mini.selectable:hover,
+.my-prop-cards--stacked .card-image-mini.switchable:hover {
+  z-index: 100 !important;
 }
 
 /* ── Card Image Mini (property cards as visual cards) ─────────────── */

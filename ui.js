@@ -593,10 +593,31 @@ const UI = (() => {
       label.style.background = COLOR_MAP[color] || '#666';
       groupEl.appendChild(label);
 
+      // Separate property cards from house/hotel cards
+      const propCards = cards.filter(c => c.actionType !== 'house' && c.actionType !== 'hotel');
+      const upgradeCards = cards.filter(c => c.actionType === 'house' || c.actionType === 'hotel');
+
       const cardsRow = document.createElement('div');
-      cardsRow.className = 'my-prop-cards';
-      for (const card of cards) {
+      cardsRow.className = 'my-prop-cards my-prop-cards--stacked';
+      // Calculate height: first card full height (58px) + 25% offset per additional card
+      const cardHeight = 58;
+      const stackOffset = Math.round(cardHeight * 0.25); // ~14-15px
+      const totalCards = propCards.length + upgradeCards.length;
+      if (totalCards > 0) {
+        const stackHeight = cardHeight + (totalCards - 1) * stackOffset;
+        cardsRow.style.height = stackHeight + 'px';
+      }
+
+      // Render property cards stacked
+      let stackIndex = 0;
+      for (const card of propCards) {
         const el = createPropertyCardElement(card);
+        // Position for stacking
+        el.style.position = 'absolute';
+        el.style.top = (stackIndex * stackOffset) + 'px';
+        el.style.left = '0';
+        el.style.zIndex = stackIndex;
+
         // Allow selecting for payment or forced deal
         if (actionTargetMode === 'select_my_property') {
           el.classList.add('selectable');
@@ -612,7 +633,29 @@ const UI = (() => {
           el.addEventListener('click', () => showWildColorSwitch(card));
         }
         cardsRow.appendChild(el);
+        stackIndex++;
       }
+
+      // Render house/hotel cards stacked on top of properties
+      for (const card of upgradeCards) {
+        const el = createPropertyCardElement(card);
+        el.style.position = 'absolute';
+        el.style.top = (stackIndex * stackOffset) + 'px';
+        el.style.left = '0';
+        el.style.zIndex = stackIndex;
+
+        if (actionTargetMode === 'select_my_property') {
+          el.classList.add('selectable');
+          el.addEventListener('click', () => {
+            if (typeof actionTargetMode._callback === 'function') {
+              actionTargetMode._callback(card.id);
+            }
+          });
+        }
+        cardsRow.appendChild(el);
+        stackIndex++;
+      }
+
       groupEl.appendChild(cardsRow);
       container.appendChild(groupEl);
     }
