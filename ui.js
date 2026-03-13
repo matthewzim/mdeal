@@ -437,23 +437,23 @@ const UI = (() => {
       const propGroups = groupProperties(opp.properties);
 
       let propsHtml = '';
-      // For side opponents, build stacked property groups
+      // Build stacked property groups (cards of same colour overlap vertically)
+      function buildStackedPropGroup(color, cards) {
+        const stackHeight = 16 + 58 + (cards.length - 1) * 15; // 16px label + card height + stacking offsets
+        let html = `<div class="prop-group prop-group--stacked" style="height:${stackHeight}px">`;
+        html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
+        for (let ci = 0; ci < cards.length; ci++) {
+          html += createMiniPropertyCard(cards[ci], ci);
+        }
+        html += `</div>`;
+        return html;
+      }
+
       if (isSide) {
         const propGroupEntries = Object.entries(propGroups);
         // Split into two rows of up to 5 colour groups each
         const row1Entries = propGroupEntries.slice(0, 5);
         const row2Entries = propGroupEntries.slice(5, 10);
-
-        function buildStackedPropGroup(color, cards) {
-          const stackHeight = 16 + 58 + (cards.length - 1) * 15; // 16px label + card height + stacking offsets
-          let html = `<div class="prop-group prop-group--stacked" style="height:${stackHeight}px">`;
-          html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
-          for (let ci = 0; ci < cards.length; ci++) {
-            html += createMiniPropertyCard(cards[ci], ci);
-          }
-          html += `</div>`;
-          return html;
-        }
 
         let propsRow1Html = '';
         for (const [color, cards] of row1Entries) {
@@ -469,13 +469,9 @@ const UI = (() => {
           propsHtml += `<div class="opponent-props-row"><div class="opponent-properties">${propsRow2Html}</div></div>`;
         }
       } else {
+        // Top/across opponents: single row of stacked property groups
         for (const [color, cards] of Object.entries(propGroups)) {
-          propsHtml += `<div class="prop-group">`;
-          propsHtml += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
-          for (const card of cards) {
-            propsHtml += createMiniPropertyCard(card);
-          }
-          propsHtml += `</div>`;
+          propsHtml += buildStackedPropGroup(color, cards);
         }
       }
 

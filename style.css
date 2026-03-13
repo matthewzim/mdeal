@@ -843,16 +843,13 @@ html, body {
   align-content: center;
 }
 
-/* In rows layout, prop groups stack label on top of cards */
-.opponent-card-area--rows .prop-group {
+/* In rows layout, property groups use stacked card display */
+.opponent-card-area--rows .opponent-properties {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.opponent-card-area--rows .prop-group .prop-group-label {
-  width: 100%;
-  margin-bottom: 2px;
+  gap: 6px;
+  justify-content: center;
 }
 
 .opponent-cards {
