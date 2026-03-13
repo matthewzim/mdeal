@@ -618,6 +618,19 @@ html, body {
   justify-content: flex-end;
 }
 
+/* Right opponent: right-align properties */
+#opponent-right .opponent-props-col {
+  align-items: flex-end;
+}
+
+#opponent-right .opponent-props-row .opponent-properties {
+  justify-content: flex-end;
+}
+
+#opponent-right .opponent-row-label {
+  text-align: right;
+}
+
 #opponent-top-left {
   grid-area: top-left;
 }
