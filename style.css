@@ -602,12 +602,14 @@ html, body {
 
 #opponent-left {
   grid-area: left;
-  min-height: 240px;
+  min-height: 200px;
+  overflow-y: auto;
 }
 
 #opponent-right {
   grid-area: right;
-  min-height: 240px;
+  min-height: 200px;
+  overflow-y: auto;
 }
 
 /* Right opponent: right-align header */
