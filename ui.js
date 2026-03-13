@@ -439,7 +439,7 @@ const UI = (() => {
       let propsHtml = '';
       // Build stacked property groups (cards of same colour overlap vertically)
       function buildStackedPropGroup(color, cards) {
-        const stackHeight = 16 + 58 + (cards.length - 1) * 15; // 16px label + card height + stacking offsets
+        const stackHeight = 8 + 58 + (cards.length - 1) * 15; // 6px label + 2px gap + card height + stacking offsets
         let html = `<div class="prop-group prop-group--stacked" style="height:${stackHeight}px">`;
         html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}"></div>`;
         for (let ci = 0; ci < cards.length; ci++) {
@@ -1453,7 +1453,7 @@ const UI = (() => {
   function createMiniPropertyCard(card, stackIndex) {
     const hasImg = getCardImagePath(card) ? ' has-card-img' : '';
     if (stackIndex != null) {
-      const topPx = 16 + stackIndex * 15; // 16px for label space + stacking offset
+      const topPx = 8 + stackIndex * 15; // 6px label + 2px gap + stacking offset
       return `<div class="card-image-tiny${hasImg}" style="position:absolute;top:${topPx}px;left:0;z-index:${stackIndex}">${buildCardImageHtml(card)}</div>`;
     }
     return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(card)}</div>`;
