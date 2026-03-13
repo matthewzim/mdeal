@@ -430,55 +430,69 @@ const UI = (() => {
       const bankValue = opp.bank.reduce((s, c) => s + (c.value || 0), 0);
       const completedSets = countCompletedSets(opp);
 
-      let propsHtml = '';
-      // Group properties by color
-      const propGroups = groupProperties(opp.properties);
-      for (const [color, cards] of Object.entries(propGroups)) {
-        propsHtml += `<div class="prop-group">`;
-        propsHtml += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
-        for (const card of cards) {
-          propsHtml += createMiniPropertyCard(card);
-        }
-        propsHtml += `</div>`;
-      }
-
       const pos = positions[i];
       const isSide = (pos === 'left' || pos === 'right');
+
+      // Group properties by color
+      const propGroups = groupProperties(opp.properties);
+
+      let propsHtml = '';
+      // For side opponents, build stacked property groups
+      if (isSide) {
+        const propGroupEntries = Object.entries(propGroups);
+        // Split into two rows of up to 5 colour groups each
+        const row1Entries = propGroupEntries.slice(0, 5);
+        const row2Entries = propGroupEntries.slice(5, 10);
+
+        function buildStackedPropGroup(color, cards) {
+          const stackHeight = 16 + 58 + (cards.length - 1) * 15; // 16px label + card height + stacking offsets
+          let html = `<div class="prop-group prop-group--stacked" style="height:${stackHeight}px">`;
+          html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
+          for (let ci = 0; ci < cards.length; ci++) {
+            html += createMiniPropertyCard(cards[ci], ci);
+          }
+          html += `</div>`;
+          return html;
+        }
+
+        let propsRow1Html = '';
+        for (const [color, cards] of row1Entries) {
+          propsRow1Html += buildStackedPropGroup(color, cards);
+        }
+        let propsRow2Html = '';
+        for (const [color, cards] of row2Entries) {
+          propsRow2Html += buildStackedPropGroup(color, cards);
+        }
+
+        propsHtml = `<div class="opponent-props-row"><div class="opponent-properties">${propsRow1Html}</div></div>`;
+        if (propsRow2Html) {
+          propsHtml += `<div class="opponent-props-row"><div class="opponent-properties">${propsRow2Html}</div></div>`;
+        }
+      } else {
+        for (const [color, cards] of Object.entries(propGroups)) {
+          propsHtml += `<div class="prop-group">`;
+          propsHtml += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
+          for (const card of cards) {
+            propsHtml += createMiniPropertyCard(card);
+          }
+          propsHtml += `</div>`;
+        }
+      }
 
       const bankHtml = opp.bank.map(c => {
         const hasImg = getCardImagePath(c) ? ' has-card-img' : '';
         return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
       }).join('');
 
-      // Split property groups into two columns for side opponents
-      const propGroupEntries = Object.entries(propGroups);
-      const propMid = Math.ceil(propGroupEntries.length / 2);
-      let propsHtml1 = '';
-      let propsHtml2 = '';
-      propGroupEntries.forEach(([color, cards], idx) => {
-        let groupHtml = `<div class="prop-group">`;
-        groupHtml += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
-        for (const card of cards) {
-          groupHtml += createMiniPropertyCard(card);
-        }
-        groupHtml += `</div>`;
-        if (idx < propMid) propsHtml1 += groupHtml;
-        else propsHtml2 += groupHtml;
-      });
-
       const cardAreaHtml = isSide
-        ? `<div class="opponent-card-area opponent-card-area--columns">
-            <div class="opponent-column opponent-column--cash">
-              <div class="opponent-column-label">Cash</div>
+        ? `<div class="opponent-card-area opponent-card-area--side">
+            <div class="opponent-side-row opponent-side-row--cash">
+              <div class="opponent-row-label">Cash</div>
               <div class="opponent-bank">${bankHtml}</div>
             </div>
-            <div class="opponent-column opponent-column--properties">
-              <div class="opponent-column-label">Properties</div>
-              <div class="opponent-properties">${propsHtml1}</div>
-            </div>
-            <div class="opponent-column opponent-column--properties">
-              <div class="opponent-column-label">Properties</div>
-              <div class="opponent-properties">${propsHtml2}</div>
+            <div class="opponent-side-row opponent-side-row--properties">
+              <div class="opponent-row-label">Properties</div>
+              ${propsHtml}
             </div>
           </div>`
         : `<div class="opponent-card-area opponent-card-area--rows">
@@ -1410,8 +1424,12 @@ const UI = (() => {
     return el;
   }
 
-  function createMiniPropertyCard(card) {
+  function createMiniPropertyCard(card, stackIndex) {
     const hasImg = getCardImagePath(card) ? ' has-card-img' : '';
+    if (stackIndex != null) {
+      const topPx = 16 + stackIndex * 15; // 16px for label space + stacking offset
+      return `<div class="card-image-tiny${hasImg}" style="position:absolute;top:${topPx}px;left:0;z-index:${stackIndex}">${buildCardImageHtml(card)}</div>`;
+    }
     return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(card)}</div>`;
   }
 

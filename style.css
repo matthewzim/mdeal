@@ -608,7 +608,7 @@ html, body {
   grid-area: right;
 }
 
-/* Right opponent: right-align header and put cash on the right */
+/* Right opponent: right-align header */
 #opponent-right .opponent-header {
   flex-direction: row-reverse;
   text-align: right;
@@ -616,22 +616,6 @@ html, body {
 
 #opponent-right .opponent-stats {
   justify-content: flex-end;
-}
-
-#opponent-right .opponent-card-area--columns {
-  grid-template-columns: 1fr 1fr auto !important;
-}
-
-#opponent-right .opponent-column--cash {
-  order: 3;
-}
-
-#opponent-right .opponent-column--properties:nth-child(2) {
-  order: 1;
-}
-
-#opponent-right .opponent-column--properties:nth-child(3) {
-  order: 2;
 }
 
 #opponent-top-left {
@@ -711,51 +695,61 @@ html, body {
   overflow: auto;
 }
 
-/* Left/Right opponents: two-column layout (cash | properties) */
-.opponent-card-area--columns {
-  display: grid !important;
-  grid-template-columns: auto 1fr 1fr;
+/* Left/Right opponents: single-column layout (cash row, then property rows) */
+.opponent-card-area--side {
+  display: flex !important;
+  flex-direction: column;
   gap: 8px;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  align-items: start;
 }
 
-.opponent-column {
+.opponent-side-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  width: 100%;
 }
 
-.opponent-column-label {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.5;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.opponent-column--cash .opponent-bank {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
+.opponent-side-row--cash .opponent-bank {
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
-.opponent-column--properties .opponent-properties {
-  flex-direction: column;
-}
-
-.opponent-column--properties .prop-group {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.opponent-column--properties .prop-group .prop-group-label {
+/* Each property row holds up to 5 colour groups side by side */
+.opponent-props-row {
   width: 100%;
+}
+
+.opponent-props-row .opponent-properties {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+/* Stacked property group: cards overlap vertically */
+.prop-group--stacked {
+  position: relative;
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.prop-group--stacked .prop-group-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 42px;
+  font-size: 0.45rem;
+  padding: 1px 2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 100;
+  box-sizing: border-box;
 }
 
 /* Top opponent: center card area */
