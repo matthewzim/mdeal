@@ -1080,7 +1080,7 @@ html, body {
 }
 
 .card-image-mini .card-img-bar {
-  height: 12px;
+  height: 36px;
   width: 100%;
   flex-shrink: 0;
 }
@@ -1149,7 +1149,7 @@ html, body {
 }
 
 .card-image-tiny .card-img-bar {
-  height: 12px;
+  height: 36px;
   width: 100%;
   flex-shrink: 0;
 }
