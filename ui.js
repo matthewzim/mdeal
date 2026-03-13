@@ -441,7 +441,7 @@ const UI = (() => {
       function buildStackedPropGroup(color, cards) {
         const stackHeight = 16 + 58 + (cards.length - 1) * 15; // 16px label + card height + stacking offsets
         let html = `<div class="prop-group prop-group--stacked" style="height:${stackHeight}px">`;
-        html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}">${COLOR_LABELS[color] || color} (${cards.length})</div>`;
+        html += `<div class="prop-group-label" style="background:${COLOR_MAP[color] || '#666'}"></div>`;
         for (let ci = 0; ci < cards.length; ci++) {
           html += createMiniPropertyCard(cards[ci], ci);
         }
@@ -590,8 +590,7 @@ const UI = (() => {
 
       const label = document.createElement('div');
       label.className = 'my-prop-label' + (isComplete ? ' complete' : '');
-      label.style.borderColor = COLOR_MAP[color] || '#666';
-      label.textContent = `${COLOR_LABELS[color] || color} (${cards.length}/${req})${isComplete ? ' ★' : ''}`;
+      label.style.background = COLOR_MAP[color] || '#666';
       groupEl.appendChild(label);
 
       const cardsRow = document.createElement('div');
