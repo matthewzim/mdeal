@@ -602,10 +602,12 @@ html, body {
 
 #opponent-left {
   grid-area: left;
+  min-height: 320px;
 }
 
 #opponent-right {
   grid-area: right;
+  min-height: 320px;
 }
 
 /* Right opponent: right-align header */
@@ -921,7 +923,7 @@ html, body {
 
 #deck-and-discard {
   position: absolute;
-  right: 8px;
+  right: 32px;
   top: 0;
   bottom: 0;
   display: flex;
