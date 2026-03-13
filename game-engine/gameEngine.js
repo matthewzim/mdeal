@@ -188,6 +188,22 @@ const GameEngine = {
     return { card: removed };
   },
 
+  playHouseHotel(state, playerId, cardId, targetColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    card.attachedColor = targetColor;
+    player.properties.push(card);
+    state.turnPlaysRemaining--;
+    state.log.push({
+      type: 'play_house_hotel',
+      player: playerId,
+      card: card.name,
+      color: targetColor,
+    });
+    return { card };
+  },
+
   playPassGo(state, playerId, cardId) {
     if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
@@ -531,6 +547,8 @@ const GameEngine = {
       const setCards = target.properties.filter(c => {
         if (c.type === CARD_TYPE.PROPERTY) return c.color === color;
         if (c.type === CARD_TYPE.WILD_PROPERTY) return c.currentColor === color;
+        // Include houses/hotels attached to this color
+        if ((c.actionType === ACTION_TYPE.HOUSE || c.actionType === ACTION_TYPE.HOTEL) && c.attachedColor === color) return true;
         return false;
       });
       for (const card of setCards) {

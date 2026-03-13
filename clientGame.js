@@ -206,6 +206,18 @@ const ClientGame = (() => {
     }
   }
 
+  async function playHouseHotel(cardId, targetColor) {
+    try {
+      const result = await SupabaseClient.playCard(gameId, 'play_house_hotel', { cardId, targetColor });
+      if (result.state) {
+        gameState = result.state;
+        UI.renderGame(gameState, playerId, playerNames);
+      }
+    } catch (err) {
+      UI.showError(err.message);
+    }
+  }
+
   async function playPassGo(cardId) {
     try {
       const result = await SupabaseClient.playCard(gameId, 'pass_go', { cardId });
@@ -421,6 +433,7 @@ const ClientGame = (() => {
     return {
       drawCards: () => localDrawCards(),
       playProperty: (cardId, chosenColor) => localPlayProperty(cardId, chosenColor),
+      playHouseHotel: (cardId, targetColor) => localPlayHouseHotel(cardId, targetColor),
       playPassGo: (cardId) => localPlayPassGo(cardId),
       playRent: (cardId, color, doubleCardId) => localPlayRent(cardId, color, doubleCardId),
       playDebtCollector: (cardId, targetId) => localPlayDebtCollector(cardId, targetId),
@@ -455,6 +468,12 @@ const ClientGame = (() => {
   function localPlayProperty(cardId, chosenColor) {
     _showCardBeforePlay(cardId);
     GameEngine.playProperty(gameState, gameState.currentPlayer, cardId, chosenColor);
+    renderLocalGame();
+  }
+
+  function localPlayHouseHotel(cardId, targetColor) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playHouseHotel(gameState, gameState.currentPlayer, cardId, targetColor);
     renderLocalGame();
   }
 
@@ -553,6 +572,14 @@ const ClientGame = (() => {
       localPlayProperty(cardId, chosenColor);
     } else {
       await playProperty(cardId, chosenColor);
+    }
+  }
+
+  async function playHouseHotelAny(cardId, targetColor) {
+    if (isLocalGame) {
+      localPlayHouseHotel(cardId, targetColor);
+    } else {
+      await playHouseHotel(cardId, targetColor);
     }
   }
 
@@ -676,6 +703,7 @@ const ClientGame = (() => {
     // Use "Any" variants which route to local or online
     drawCards: drawCardsAny,
     playProperty: playPropertyAny,
+    playHouseHotel: playHouseHotelAny,
     bankCard: bankCardAny,
     playPassGo: playPassGoAny,
     playRent: playRentAny,

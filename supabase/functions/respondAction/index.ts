@@ -330,6 +330,8 @@ function executePropertyAction(state: any) {
     const setCards = target.properties.filter((c: any) => {
       if (c.type === 'property') return c.color === color;
       if (c.type === 'wild_property') return c.currentColor === color;
+      // Include houses/hotels attached to this color
+      if ((c.actionType === 'house' || c.actionType === 'hotel') && c.attachedColor === color) return true;
       return false;
     });
     for (const card of setCards) {

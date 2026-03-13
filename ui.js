@@ -691,6 +691,7 @@ const UI = (() => {
       case 'deal_breaker': return `${n(entry.player)} played Deal Breaker on ${n(entry.target)} for ${COLOR_LABELS[entry.color] || entry.color}`;
       case 'just_say_no': return `${n(entry.player)} played Just Say No!`;
       case 'payment': return `${n(entry.from)} paid ${n(entry.to)}`;
+      case 'play_house_hotel': return `${n(entry.player)} played ${entry.card} on ${COLOR_LABELS[entry.color] || entry.color}`;
       case 'discard': return `${n(entry.player)} discarded ${entry.count} cards`;
       case 'end_turn': return `${n(entry.player)} ended their turn`;
       case 'win': return `🏆 ${n(entry.player)} WINS! 🏆`;
@@ -1075,6 +1076,21 @@ const UI = (() => {
         case 'just_say_no':
           html += `<p class="card-detail">This card is played in response to actions against you.</p>`;
           break;
+
+        case 'house':
+        case 'hotel': {
+          const completedColors = getCompletedSetColors(player).filter(c => c !== 'railroad' && c !== 'utility');
+          if (completedColors.length > 0) {
+            html += `<div class="color-picker"><p>Add to complete set:</p>`;
+            for (const color of completedColors) {
+              html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doPlayHouseHotel('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+            }
+            html += `</div>`;
+          } else {
+            html += `<p class="card-detail">No eligible complete sets (requires a non-railroad/utility complete set)</p>`;
+          }
+          break;
+        }
       }
     }
 
@@ -1147,6 +1163,12 @@ const UI = (() => {
     _showMyPlayedCard(cardId);
     _closeOverlay();
     await ClientGame.playProperty(cardId, chosenColor);
+  }
+
+  async function _doPlayHouseHotel(cardId, targetColor) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playHouseHotel(cardId, targetColor);
   }
 
   async function _doPassGo(cardId) {
@@ -1335,6 +1357,9 @@ const UI = (() => {
     'Rent: Darkblue/Green': 'rent-green-and-dark-blue.png',
     'Rent: Railroad/Utility': 'rent-black-and-utility.png',
     'Multi Rent (Wild)': 'rent-all-colours.png',
+    // House & Hotel cards
+    'House': 'house.png',
+    'Hotel': 'hotel.png',
   };
 
   const RENT_COLOR_IMAGE_MAP = {
@@ -1502,7 +1527,13 @@ const UI = (() => {
   function groupProperties(properties) {
     const groups = {};
     for (const card of properties) {
-      const color = card.type === 'wild_property' ? card.currentColor : card.color;
+      let color;
+      if (card.actionType === 'house' || card.actionType === 'hotel') {
+        color = card.attachedColor;
+      } else {
+        color = card.type === 'wild_property' ? card.currentColor : card.color;
+      }
+      if (!color) continue;
       if (!groups[color]) groups[color] = [];
       groups[color].push(card);
     }
@@ -1545,6 +1576,9 @@ const UI = (() => {
   }
 
   function isCardInCompletedSet(player, card) {
+    if (card.actionType === 'house' || card.actionType === 'hotel') {
+      return card.attachedColor ? countPlayerColor(player, card.attachedColor) >= getSetRequirement(card.attachedColor) : false;
+    }
     const color = card.type === 'wild_property' ? card.currentColor : card.color;
     return countPlayerColor(player, color) >= getSetRequirement(color);
   }
@@ -1693,7 +1727,7 @@ const UI = (() => {
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
     renderChatMessages, sendChat,
     // Exposed for onclick handlers in HTML
-    _closeOverlay, _doBank, _doPlayProperty, _doPassGo, _doRent,
+    _closeOverlay, _doBank, _doPlayProperty, _doPlayHouseHotel, _doPassGo, _doRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,
     _doForcedDeal, _doDealBreaker, _handleAccept, _handleJSN,
     _togglePaymentCard, _confirmPayment, _doSwitchWild,

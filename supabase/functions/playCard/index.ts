@@ -53,7 +53,11 @@ function rentAmount(player: any, color: string) {
   const count = countColor(player, color);
   const table = RENT_VALUES[color];
   if (!table || count === 0) return 0;
-  return table[Math.min(count, table.length) - 1];
+  let rent = table[Math.min(count, table.length) - 1];
+  // Add house bonus (3M each) and hotel bonus (4M each)
+  rent += player.properties.filter((c: any) => c.actionType === 'house' && c.attachedColor === color).length * 3;
+  rent += player.properties.filter((c: any) => c.actionType === 'hotel' && c.attachedColor === color).length * 4;
+  return rent;
 }
 
 function hasWon(player: any) {
@@ -425,6 +429,30 @@ serve(async (req) => {
 
       await saveState(supabase, gameId, state);
       await recordMove(supabase, gameId, playerId, 'deal_breaker', { cardId, targetId, targetColor });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── Play House/Hotel ──
+    if (action === 'play_house_hotel') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card) return fail("Card not in hand");
+      if (card.actionType !== 'house' && card.actionType !== 'hotel') return fail("Not a House or Hotel card");
+      if (!targetColor) return fail("Must specify a target color");
+      if (targetColor === 'railroad' || targetColor === 'utility') {
+        return fail("Cannot add houses/hotels to railroad or utility sets");
+      }
+      if (!isSetComplete(player, targetColor)) {
+        return fail("Can only add to a complete property set");
+      }
+
+      const removed = removeFromHand(player, cardId);
+      removed.attachedColor = targetColor;
+      player.properties.push(removed);
+      state.turnPlaysRemaining--;
+      state.log.push({ type: 'play_house_hotel', player: playerId, card: removed.name, color: targetColor });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'play_house_hotel', { cardId, targetColor });
       return ok({ state: playerView(state, playerId) });
     }
 

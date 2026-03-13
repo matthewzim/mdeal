@@ -58,6 +58,8 @@ const ACTION_TYPE = {
   FORCED_DEAL: 'forced_deal',
   DEAL_BREAKER: 'deal_breaker',
   JUST_SAY_NO: 'just_say_no',
+  HOUSE: 'house',
+  HOTEL: 'hotel',
 };
 
 let _cardIdCounter = 0;
@@ -277,6 +279,16 @@ function buildFullDeck() {
   // Multi-color rent x 3
   for (let i = 0; i < 3; i++) {
     deck.push(createMultiRentCard(3));
+  }
+
+  // === HOUSE & HOTEL CARDS ===
+  // House x 3 (value 3M, adds 3M rent to a complete set)
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.HOUSE, 'House', 3));
+  }
+  // Hotel x 3 (value 4M, adds 4M rent to a complete set)
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.HOTEL, 'Hotel', 4));
   }
 
   return deck;
