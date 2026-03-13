@@ -569,14 +569,14 @@ html, body {
 .game-table {
   flex: 1;
   display: grid;
-  grid-template-columns: 420px 1fr 420px 260px;
+  grid-template-columns: repeat(4, 1fr) 260px;
   grid-template-rows: auto auto 1fr auto auto;
   grid-template-areas:
-    "top-left  top-left  top-left   game-info"
-    "top       top       top        game-info"
-    "left      center    right      game-info"
-    "my-bank   center    my-props   game-info"
-    "my-hand   my-hand   my-hand    game-info";
+    "top-left  top-left  top-left  top-left  game-info"
+    "top       top       top       top       game-info"
+    "left      center    center    right     game-info"
+    "my-props  my-props  my-bank   my-bank   game-info"
+    "my-hand   my-hand   my-hand   my-hand   game-info";
   gap: 8px;
   padding: 8px;
   min-height: 100%;
@@ -1009,7 +1009,7 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  align-items: stretch;
+  align-items: flex-end;
   padding: 8px;
   overflow-y: auto;
 }
@@ -1019,7 +1019,7 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  align-items: stretch;
+  align-items: flex-end;
   padding: 8px;
   overflow-y: auto;
 }
@@ -1028,7 +1028,7 @@ html, body {
 #my-properties {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 8px;
   padding: 8px;
   background: rgba(0,0,0,0.15);
@@ -1182,7 +1182,7 @@ html, body {
   padding: 8px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 6px;
   align-items: flex-start;
   min-height: 90px;
@@ -1192,9 +1192,9 @@ html, body {
   font-weight: bold;
   font-size: 0.85rem;
   color: var(--accent-green);
-  margin-right: 8px;
+  margin-left: 8px;
   width: 100%;
-  text-align: left;
+  text-align: right;
 }
 
 .bank-card {
@@ -1814,8 +1814,8 @@ html, body {
       "top"
       "game-info"
       "center"
-      "my-bank"
       "my-props"
+      "my-bank"
       "my-hand";
   }
 
