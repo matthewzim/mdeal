@@ -484,17 +484,23 @@ const UI = (() => {
         return `<div class="card-image-tiny${hasImg}">${buildCardImageHtml(c)}</div>`;
       }).join('');
 
-      const cardAreaHtml = isSide
-        ? `<div class="opponent-card-area opponent-card-area--side">
-            <div class="opponent-side-row opponent-side-row--cash">
+      const cashColHtml = `<div class="opponent-cash-col">
               <div class="opponent-row-label">Cash</div>
               <div class="opponent-bank">${bankHtml}</div>
-            </div>
-            <div class="opponent-side-row opponent-side-row--properties">
+            </div>`;
+      const propsColHtml = `<div class="opponent-props-col">
               <div class="opponent-row-label">Properties</div>
               ${propsHtml}
-            </div>
-          </div>`
+            </div>`;
+
+      const cardAreaHtml = isSide
+        ? (pos === 'left'
+          ? `<div class="opponent-card-area opponent-card-area--side">
+              ${cashColHtml}${propsColHtml}
+            </div>`
+          : `<div class="opponent-card-area opponent-card-area--side">
+              ${propsColHtml}${cashColHtml}
+            </div>`)
         : `<div class="opponent-card-area opponent-card-area--rows">
             <div class="opponent-row opponent-row--cash">
               <div class="opponent-row-label">Cash</div>

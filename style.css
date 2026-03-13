@@ -695,27 +695,39 @@ html, body {
   overflow: auto;
 }
 
-/* Left/Right opponents: single-column layout (cash row, then property rows) */
+/* Left/Right opponents: horizontal layout (cash column beside properties) */
 .opponent-card-area--side {
   display: flex !important;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
 
-.opponent-side-row {
+/* Fixed-width cash column (fits two card columns: 42px + 4px gap + 42px = 88px) */
+.opponent-cash-col {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
+  width: 96px;
+  min-width: 96px;
+  flex-shrink: 0;
 }
 
-.opponent-side-row--cash .opponent-bank {
+.opponent-cash-col .opponent-bank {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+/* Properties column takes remaining space */
+.opponent-props-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Each property row holds up to 5 colour groups side by side */
