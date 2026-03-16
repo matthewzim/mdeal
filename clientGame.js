@@ -310,9 +310,9 @@ const ClientGame = (() => {
     }
   }
 
-  async function playRent(cardId, targetColor, doubleCardId) {
+  async function playRent(cardId, targetColor, doubleCardId, targetId) {
     try {
-      const result = await SupabaseClient.playCard(gameId, 'rent', { cardId, targetColor, doubleCardId });
+      const result = await SupabaseClient.playCard(gameId, 'rent', { cardId, targetColor, doubleCardId, targetId });
       if (result.state) {
         gameState = result.state;
         UI.renderGame(gameState, playerId, playerNames);
@@ -515,7 +515,7 @@ const ClientGame = (() => {
       playProperty: (cardId, chosenColor) => localPlayProperty(cardId, chosenColor),
       playHouseHotel: (cardId, targetColor) => localPlayHouseHotel(cardId, targetColor),
       playPassGo: (cardId) => localPlayPassGo(cardId),
-      playRent: (cardId, color, doubleCardId) => localPlayRent(cardId, color, doubleCardId),
+      playRent: (cardId, color, doubleCardId, targetId) => localPlayRent(cardId, color, doubleCardId, targetId),
       playDebtCollector: (cardId, targetId) => localPlayDebtCollector(cardId, targetId),
       playBirthday: (cardId) => localPlayBirthday(cardId),
       playSlyDeal: (cardId, targetId, targetCardId) => localPlaySlyDeal(cardId, targetId, targetCardId),
@@ -563,10 +563,10 @@ const ClientGame = (() => {
     renderLocalGame();
   }
 
-  function localPlayRent(cardId, color, doubleCardId) {
+  function localPlayRent(cardId, color, doubleCardId, targetId) {
     _showCardBeforePlay(cardId);
     if (doubleCardId) _showCardBeforePlay(doubleCardId);
-    GameEngine.playRent(gameState, gameState.currentPlayer, cardId, color, doubleCardId || null);
+    GameEngine.playRent(gameState, gameState.currentPlayer, cardId, color, doubleCardId || null, targetId || null);
     renderLocalGame();
   }
 
@@ -679,11 +679,11 @@ const ClientGame = (() => {
     }
   }
 
-  async function playRentAny(cardId, targetColor, doubleCardId) {
+  async function playRentAny(cardId, targetColor, doubleCardId, targetId) {
     if (isLocalGame) {
-      localPlayRent(cardId, targetColor);
+      localPlayRent(cardId, targetColor, doubleCardId, targetId);
     } else {
-      await playRent(cardId, targetColor, doubleCardId);
+      await playRent(cardId, targetColor, doubleCardId, targetId);
     }
   }
 

@@ -322,10 +322,11 @@ const ComputerPlayer = (() => {
       // Charge high rent
       const rentPlay = findBestRentPlay(player, state, computerId);
       if (rentPlay && rentPlay.amount >= 3) {
+        const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
         if (rentPlay.doubleCardId) {
-          callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId);
+          callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
         } else {
-          callbacks.playRent(rentPlay.cardId, rentPlay.color);
+          callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
         }
         return;
       }
@@ -406,10 +407,11 @@ const ComputerPlayer = (() => {
     // Priority 7: Play rent (especially if high payout or double rent available)
     const rentPlay = findBestRentPlay(player, state, computerId);
     if (rentPlay) {
+      const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
       if (rentPlay.doubleCardId) {
-        callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId);
+        callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
       } else {
-        callbacks.playRent(rentPlay.cardId, rentPlay.color);
+        callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
       }
       return;
     }
@@ -622,6 +624,7 @@ const ComputerPlayer = (() => {
             color,
             amount: effectiveAmount,
             doubleCardId: doubleRent ? doubleRent.id : null,
+            isMultiRent: card.actionType === 'multi_rent',
           };
         }
       }
