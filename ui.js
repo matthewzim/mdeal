@@ -152,6 +152,18 @@ const UI = (() => {
   function showLobbyScreen() { showScreen('lobby-screen'); }
   function showGameScreen() { showScreen('game-screen'); }
 
+  function exitGame() {
+    if (!confirm('Are you sure you want to exit the game?')) return;
+    ClientGame.clearActiveSession();
+    SupabaseClient.unsubscribeAll();
+    // Hide game-specific panels
+    const chatPanel = document.getElementById('chat-panel');
+    if (chatPanel) chatPanel.classList.remove('active');
+    const exitBtn = document.getElementById('exit-game-btn');
+    if (exitBtn) exitBtn.classList.remove('active');
+    showLoginScreen();
+  }
+
   // ── Login screen ─────────────────────────────────────────────────────
 
   function initLoginHandlers() {
@@ -389,6 +401,12 @@ const UI = (() => {
     const chatPanel = document.getElementById('chat-panel');
     if (chatPanel) {
       chatPanel.classList.add('active');
+    }
+
+    // Show exit game button
+    const exitBtn = document.getElementById('exit-game-btn');
+    if (exitBtn) {
+      exitBtn.classList.add('active');
     }
 
     // Render deck and last action card in center
@@ -1788,7 +1806,7 @@ const UI = (() => {
   }
 
   return {
-    init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen,
+    init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen, exitGame,
     updateLobby, refreshPublicGames, renderGame, showError, showToast, showLoading,
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
     renderChatMessages, sendChat, updateStatsDashboard,
