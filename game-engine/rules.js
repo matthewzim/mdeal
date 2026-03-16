@@ -403,6 +403,19 @@ const Rules = {
     return { valid: true };
   },
 
+  validateDoubleRentAlone(state, playerId, cardId, targetColor) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.DOUBLE_RENT) return { valid: false, reason: 'Not a Double The Rent card' };
+    if (!Object.values(COLORS).includes(targetColor)) return { valid: false, reason: 'Invalid color' };
+    if (this.countColor(player, targetColor) === 0) return { valid: false, reason: 'No properties of that color' };
+    return { valid: true };
+  },
+
   validateSuperSlyDeal(state, playerId, cardId, targetColor) {
     const player = this.getPlayer(state, playerId);
     if (!player) return { valid: false, reason: 'Player not found' };

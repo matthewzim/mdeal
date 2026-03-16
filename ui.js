@@ -1097,7 +1097,9 @@ const UI = (() => {
           html += `<button class="btn btn-action" onclick="UI._doPassGo('${card.id}')">Play: Draw 2 Cards</button>`;
           break;
 
-        case 'rent':
+        case 'rent': {
+          const doubleRentCard = player.hand.find(c => c.actionType === 'double_rent');
+          const canDouble = doubleRentCard && state.turnPlaysRemaining >= 2;
           html += `<div class="color-picker"><p>Charge rent for:</p>`;
           for (const color of card.rentColors) {
             if (countPlayerColor(player, color) > 0) {
@@ -1105,9 +1107,15 @@ const UI = (() => {
             }
           }
           html += `</div>`;
+          if (canDouble) {
+            html += `<div class="double-rent-option"><label><input type="checkbox" id="double-rent-check" data-double-id="${doubleRentCard.id}"> Double The Rent! (uses 2 plays)</label></div>`;
+          }
           break;
+        }
 
-        case 'multi_rent':
+        case 'multi_rent': {
+          const doubleRentCardMR = player.hand.find(c => c.actionType === 'double_rent');
+          const canDoubleMR = doubleRentCardMR && state.turnPlaysRemaining >= 2;
           html += `<div class="color-picker"><p>Charge rent for:</p>`;
           for (const color of Object.keys(COLOR_MAP)) {
             if (countPlayerColor(player, color) > 0) {
@@ -1115,7 +1123,11 @@ const UI = (() => {
             }
           }
           html += `</div>`;
+          if (canDoubleMR) {
+            html += `<div class="double-rent-option"><label><input type="checkbox" id="double-rent-check" data-double-id="${doubleRentCardMR.id}"> Double The Rent! (uses 2 plays)</label></div>`;
+          }
           break;
+        }
 
         case 'debt_collector':
           html += `<div class="target-picker"><p>Target player:</p>`;
@@ -1179,7 +1191,17 @@ const UI = (() => {
           break;
 
         case 'double_rent':
-          html += `<p class="card-detail">Play this with a Rent card (auto-applied when charging rent)</p>`;
+          if (_isNoMercyMode()) {
+            html += `<div class="color-picker"><p>Charge double rent for (all opponents):</p>`;
+            for (const color of Object.keys(COLOR_MAP)) {
+              if (countPlayerColor(player, color) > 0) {
+                html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doDoubleRentAlone('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+              }
+            }
+            html += `</div>`;
+          } else {
+            html += `<p class="card-detail">Play this with a Rent card (auto-applied when charging rent)</p>`;
+          }
           break;
 
         case 'just_say_no':
@@ -1223,6 +1245,8 @@ const UI = (() => {
           break;
 
         case 'nm_rent': {
+          const doubleRentCardNM = player.hand.find(c => c.actionType === 'double_rent');
+          const canDoubleNM = doubleRentCardNM && state.turnPlaysRemaining >= 2;
           html += `<div class="color-picker"><p>Charge rent for (all opponents):</p>`;
           for (const color of Object.keys(COLOR_MAP)) {
             if (countPlayerColor(player, color) > 0) {
@@ -1230,6 +1254,9 @@ const UI = (() => {
             }
           }
           html += `</div>`;
+          if (canDoubleNM) {
+            html += `<div class="double-rent-option"><label><input type="checkbox" id="double-rent-check" data-double-id="${doubleRentCardNM.id}"> Double The Rent! (uses 2 plays)</label></div>`;
+          }
           break;
         }
 
@@ -1400,25 +1427,31 @@ const UI = (() => {
   }
 
   async function _doRent(cardId, targetColor) {
+    const checkbox = document.getElementById('double-rent-check');
+    const doubleCardId = checkbox && checkbox.checked ? checkbox.dataset.doubleId : null;
     _showMyPlayedCard(cardId);
+    if (doubleCardId) _showMyPlayedCard(doubleCardId);
     _closeOverlay();
-    // TODO: support double rent selection
-    await ClientGame.playRent(cardId, targetColor, null);
+    await ClientGame.playRent(cardId, targetColor, doubleCardId);
   }
 
   function _showMultiRentTargetPicker(cardId, targetColor) {
+    // Capture double rent selection before rebuilding the overlay
+    const checkbox = document.getElementById('double-rent-check');
+    const doubleCardId = checkbox && checkbox.checked ? checkbox.dataset.doubleId : null;
+
     const state = ClientGame.getGameState();
     const myId = ClientGame.getPlayerId();
     const names = ClientGame.getPlayerNames();
     const overlay = document.getElementById('action-overlay');
 
     let html = `<div class="action-modal card-action-modal">`;
-    html += `<h3>Multi Rent: ${COLOR_LABELS[targetColor]}</h3>`;
+    html += `<h3>Multi Rent: ${COLOR_LABELS[targetColor]}${doubleCardId ? ' (Doubled!)' : ''}</h3>`;
     html += `<div class="target-picker"><p>Charge rent to:</p>`;
     for (const p of state.players) {
       if (p.id === myId) continue;
       const name = names[p.id] || 'Unknown';
-      html += `<button class="btn btn-target" onclick="UI._doMultiRent('${cardId}', '${targetColor}', '${p.id}')">${escapeHtml(name)}</button>`;
+      html += `<button class="btn btn-target" onclick="UI._doMultiRent('${cardId}', '${targetColor}', '${p.id}', ${doubleCardId ? `'${doubleCardId}'` : 'null'})">${escapeHtml(name)}</button>`;
     }
     html += `</div>`;
     html += `<button class="btn btn-cancel" onclick="UI._closeOverlay()">Cancel</button>`;
@@ -1427,10 +1460,11 @@ const UI = (() => {
     overlay.innerHTML = html;
   }
 
-  async function _doMultiRent(cardId, targetColor, targetId) {
+  async function _doMultiRent(cardId, targetColor, targetId, doubleCardId) {
     _showMyPlayedCard(cardId);
+    if (doubleCardId) _showMyPlayedCard(doubleCardId);
     _closeOverlay();
-    await ClientGame.playRent(cardId, targetColor, null, targetId);
+    await ClientGame.playRent(cardId, targetColor, doubleCardId || null, targetId);
   }
 
   async function _doDebtCollector(cardId, targetId) {
@@ -1494,9 +1528,18 @@ const UI = (() => {
   }
 
   async function _doNmRent(cardId, targetColor) {
+    const checkbox = document.getElementById('double-rent-check');
+    const doubleCardId = checkbox && checkbox.checked ? checkbox.dataset.doubleId : null;
+    _showMyPlayedCard(cardId);
+    if (doubleCardId) _showMyPlayedCard(doubleCardId);
+    _closeOverlay();
+    await ClientGame.playNmRent(cardId, targetColor, doubleCardId);
+  }
+
+  async function _doDoubleRentAlone(cardId, targetColor) {
     _showMyPlayedCard(cardId);
     _closeOverlay();
-    await ClientGame.playNmRent(cardId, targetColor, null);
+    await ClientGame.playDoubleRentAlone(cardId, targetColor);
   }
 
   async function _doSuperSlyDeal(cardId, targetColor) {
@@ -2122,7 +2165,7 @@ const UI = (() => {
     _doForcedDeal, _doDealBreaker, _handleAccept, _handleJSN,
     _togglePaymentCard, _confirmPayment, _doSwitchWild,
     // No Mercy action handlers
-    _doShack, _doNmPassGo, _doNmRent, _doSuperSlyDeal,
+    _doShack, _doNmPassGo, _doNmRent, _doDoubleRentAlone, _doSuperSlyDeal,
     _doRepossession, _doToughLuck, _doYoink, _doUnfairTrade,
   };
 })();

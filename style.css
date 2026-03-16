@@ -1776,6 +1776,21 @@ body.nomercy-mode {
   margin-bottom: 8px;
 }
 
+.double-rent-option {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 8px;
+}
+
+.double-rent-option label {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffd700;
+}
+
 .color-picker, .target-picker {
   margin-top: 12px;
 }

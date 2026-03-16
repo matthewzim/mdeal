@@ -561,6 +561,37 @@ serve(async (req) => {
       return ok({ state: playerView(state, playerId) });
     }
 
+    // ── No Mercy: Double Rent Alone (standalone double rent card) ──
+    if (action === 'double_rent_alone') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'double_rent') return fail("Not a Double The Rent card");
+      if (!ALL_COLORS.includes(targetColor)) return fail("Invalid color");
+      if (countColor(player, targetColor) === 0) return fail("No properties of that color");
+      if (state.turnPlaysRemaining < 1) return fail("Not enough plays");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      let rent = rentAmount(player, targetColor);
+      rent *= 2;
+
+      const targets = state.players.filter((p: any) => p.id !== playerId).map((p: any) => p.id);
+      state.pendingAction = {
+        type: 'rent', from: playerId,
+        targets: targets.map((t: string) => ({ playerId: t, amount: rent, paid: false, cancelled: false })),
+        color: targetColor, amount: rent, doubled: true,
+        respondQueue: [...targets],
+        currentResponder: targets[0] || null,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rent, doubled: true });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'double_rent_alone', { cardId, targetColor });
+      return ok({ state: playerView(state, playerId) });
+    }
+
     // ── No Mercy: Super Sly Deal ──
     if (action === 'super_sly_deal') {
       const card = player.hand.find((c: any) => c.id === cardId);
