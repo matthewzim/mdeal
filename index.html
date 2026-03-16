@@ -24,6 +24,24 @@
       <h1>MDEAL.IO</h1>
       <h2>Online Multiplayer Card Game</h2>
 
+      <!-- Player Stats Dashboard -->
+      <div id="player-stats-dashboard" class="stats-dashboard">
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-value" id="stat-games">0</div>
+            <div class="stat-label">Games</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-winrate">0%</div>
+            <div class="stat-label">Win Rate</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-elo">1200</div>
+            <div class="stat-label">Rating</div>
+          </div>
+        </div>
+      </div>
+
       <div class="input-group">
         <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">
       </div>
@@ -174,14 +192,38 @@
   <script>
     async function initApp() {
       UI.init();
+
+      // Ensure persistent player ID exists
+      ClientGame.getOrCreatePersistentId();
+
+      // Restore saved username
+      const savedName = ClientGame.getSavedUsername();
+      if (savedName) {
+        document.getElementById('input-username').value = savedName;
+      }
+
+      // Populate stats dashboard
+      UI.updateStatsDashboard();
+
       try {
         SupabaseClient.init();
 
-        // Try to restore session
+        // Try to restore Supabase session
         let session = await SupabaseClient.getSession();
         if (!session) {
-          // Sign in anonymously
           await SupabaseClient.signInAnonymously();
+        }
+
+        // Try to reconnect to an active game
+        const reconnected = await ClientGame.tryReconnect();
+        if (reconnected) {
+          const gs = ClientGame.getGameState();
+          if (gs) {
+            UI.showGameScreen();
+            UI.renderGame(gs, ClientGame.getPlayerId(), ClientGame.getPlayerNames());
+            UI.showToast('Reconnected to your game!');
+            return;
+          }
         }
 
         UI.showToast('Connected to Supabase!');

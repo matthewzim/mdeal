@@ -17,6 +17,79 @@ const ClientGame = (() => {
   let chatSubscription = null;
   let roomIsPublic = false;
 
+  // ── Persistent Anonymous Player ID ──────────────────────────────────
+  const PLAYER_ID_KEY = 'mdeal_player_id';
+  const USERNAME_KEY = 'mdeal_username';
+  const SESSION_KEY = 'mdeal_active_session';
+  const STATS_KEY = 'mdeal_player_stats';
+
+  function getOrCreatePersistentId() {
+    let id = localStorage.getItem(PLAYER_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(PLAYER_ID_KEY, id);
+    }
+    return id;
+  }
+
+  function getSavedUsername() {
+    return localStorage.getItem(USERNAME_KEY) || '';
+  }
+
+  function saveUsername(name) {
+    localStorage.setItem(USERNAME_KEY, name);
+  }
+
+  // ── Active Session Persistence (for reconnection) ───────────────────
+
+  function saveActiveSession() {
+    if (!roomId || isLocalGame) return;
+    const session = { roomId, gameId, playerId, username, isHost, roomIsPublic };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }
+
+  function clearActiveSession() {
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  function getActiveSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
+  // ── Game Stats (localStorage) ───────────────────────────────────────
+
+  function getStats() {
+    try {
+      const raw = localStorage.getItem(STATS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { gamesPlayed: 0, wins: 0, losses: 0, elo: 1200 };
+  }
+
+  function saveStats(stats) {
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  }
+
+  function recordGameResult(won, opponentCount) {
+    const stats = getStats();
+    stats.gamesPlayed++;
+    if (won) {
+      stats.wins++;
+    } else {
+      stats.losses++;
+    }
+    // Elo calculation: expected score vs average opponent (all at 1200)
+    const K = 32;
+    const expected = 1 / (1 + Math.pow(10, (1200 - stats.elo) / 400));
+    const actual = won ? 1 : 0;
+    stats.elo = Math.round(stats.elo + K * (actual - expected));
+    saveStats(stats);
+    return stats;
+  }
+
   // ── Initialization ───────────────────────────────────────────────────
 
   function setPlayer(id, name) {
@@ -43,6 +116,8 @@ const ClientGame = (() => {
     playerId = data.playerId;
     username = name;
     isHost = true;
+    saveUsername(name);
+    saveActiveSession();
     subscribeToRoomUpdates();
     return data;
   }
@@ -54,6 +129,8 @@ const ClientGame = (() => {
     username = name;
     isHost = false;
     roomIsPublic = false;
+    saveUsername(name);
+    saveActiveSession();
     subscribeToRoomUpdates();
     return data;
   }
@@ -65,6 +142,8 @@ const ClientGame = (() => {
     username = name;
     isHost = false;
     roomIsPublic = true;
+    saveUsername(name);
+    saveActiveSession();
     subscribeToRoomUpdates();
     return data;
   }
@@ -120,6 +199,7 @@ const ClientGame = (() => {
       playerNames[p.player_id] = p.players?.username || 'Unknown';
     }
 
+    saveActiveSession();
     subscribeToGameUpdates();
     subscribeToChatUpdates();
     UI.renderGame(gameState, playerId, playerNames);
@@ -694,12 +774,81 @@ const ClientGame = (() => {
     }
   }
 
+  // ── Reconnection ─────────────────────────────────────────────────────
+
+  async function tryReconnect() {
+    const session = getActiveSession();
+    if (!session || !session.roomId || !session.playerId) return false;
+
+    try {
+      // Check if the room still exists and is playing
+      const game = await SupabaseClient.getGame(session.roomId);
+      if (!game || !game.game_state_json) {
+        clearActiveSession();
+        return false;
+      }
+
+      // Check game is not finished
+      if (game.game_state_json.phase === 'finished') {
+        clearActiveSession();
+        return false;
+      }
+
+      // Check our player is still in this game
+      const gamePlayers = game.game_state_json.players || [];
+      const isInGame = gamePlayers.some(p => p.id === session.playerId);
+      if (!isInGame) {
+        clearActiveSession();
+        return false;
+      }
+
+      // Restore session state
+      roomId = session.roomId;
+      gameId = game.id;
+      playerId = session.playerId;
+      username = session.username;
+      isHost = session.isHost;
+      roomIsPublic = session.roomIsPublic || false;
+      gameState = game.game_state_json;
+
+      // Build player names map
+      const players = await SupabaseClient.getRoomPlayers(roomId);
+      for (const p of players) {
+        playerNames[p.player_id] = p.players?.username || 'Unknown';
+      }
+
+      subscribeToRoomUpdates();
+      subscribeToGameUpdates();
+      subscribeToChatUpdates();
+      return true;
+    } catch (err) {
+      console.error('Reconnect failed:', err);
+      clearActiveSession();
+      return false;
+    }
+  }
+
+  // ── Game Over Stats ─────────────────────────────────────────────────
+
+  let gameOverRecorded = false;
+
+  function handleGameOver(winnerId) {
+    if (gameOverRecorded) return; // prevent double-counting
+    gameOverRecorded = true;
+    const won = winnerId === playerId;
+    const opponentCount = (gameState?.players?.length || 2) - 1;
+    recordGameResult(won, opponentCount);
+    clearActiveSession();
+  }
+
   return {
     setPlayer, getPlayerId, getUsername, getRoomId, getGameId,
     getGameState, getIsHost, getPlayerNames, isComputerGame,
     getRoomIsPublic,
     createRoom, joinRoom, joinPublicRoom, toggleReady, startGame, loadGame,
     refreshRoomPlayers, startLocalGame, sendChat,
+    tryReconnect, handleGameOver, getStats, getSavedUsername,
+    getOrCreatePersistentId, clearActiveSession,
     // Use "Any" variants which route to local or online
     drawCards: drawCardsAny,
     playProperty: playPropertyAny,
