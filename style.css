@@ -79,8 +79,65 @@ html, body {
   font-size: 1rem;
   color: var(--text-light);
   opacity: 0.8;
-  margin-bottom: 30px;
+  margin-bottom: 16px;
   font-weight: normal;
+}
+
+/* ── Player Stats Dashboard ─────────────────────────────────────────── */
+
+.stats-dashboard {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--gold);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* ── Winner Stats Summary ───────────────────────────────────────────── */
+
+.winner-stats-summary {
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+
+.winner-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.9rem;
+}
+
+.winner-stat-row span:last-child {
+  font-weight: bold;
+  color: var(--gold);
 }
 
 .input-group {

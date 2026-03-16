@@ -1704,14 +1704,23 @@ const UI = (() => {
   }
 
   function showWinner(winnerId, names) {
+    // Record game result and clear session
+    ClientGame.handleGameOver(winnerId);
+
     const overlay = document.getElementById('action-overlay');
     overlay.style.display = 'flex';
     const name = names[winnerId] || 'Unknown';
     const isMe = winnerId === ClientGame.getPlayerId();
+    const stats = ClientGame.getStats();
     overlay.innerHTML = `
       <div class="action-modal winner-modal">
         <h2>${isMe ? 'YOU WIN!' : escapeHtml(name) + ' Wins!'}</h2>
         <p>${isMe ? 'Congratulations! You completed 3 property sets!' : escapeHtml(name) + ' completed 3 property sets.'}</p>
+        <div class="winner-stats-summary">
+          <div class="winner-stat-row"><span>Games Played:</span><span>${stats.gamesPlayed}</span></div>
+          <div class="winner-stat-row"><span>Win Rate:</span><span>${stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0}%</span></div>
+          <div class="winner-stat-row"><span>Rating:</span><span>${stats.elo}</span></div>
+        </div>
         <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
       </div>
     `;
@@ -1746,6 +1755,26 @@ const UI = (() => {
     ClientGame.sendChat(text);
   }
 
+  // ── Stats Dashboard ──────────────────────────────────────────────────
+
+  function updateStatsDashboard() {
+    const stats = ClientGame.getStats();
+    const gamesEl = document.getElementById('stat-games');
+    const winrateEl = document.getElementById('stat-winrate');
+    const eloEl = document.getElementById('stat-elo');
+    if (gamesEl) gamesEl.textContent = stats.gamesPlayed;
+    if (winrateEl) winrateEl.textContent = stats.gamesPlayed > 0
+      ? Math.round((stats.wins / stats.gamesPlayed) * 100) + '%'
+      : '0%';
+    if (eloEl) eloEl.textContent = stats.elo;
+
+    // Hide dashboard if no games played yet
+    const dashboard = document.getElementById('player-stats-dashboard');
+    if (dashboard) {
+      dashboard.style.display = stats.gamesPlayed > 0 ? 'block' : 'none';
+    }
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────
 
   let initialized = false;
@@ -1768,7 +1797,7 @@ const UI = (() => {
     init, showScreen, showLoginScreen, showLobbyScreen, showGameScreen,
     updateLobby, refreshPublicGames, renderGame, showError, showToast, showLoading,
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
-    renderChatMessages, sendChat,
+    renderChatMessages, sendChat, updateStatsDashboard,
     // Exposed for onclick handlers in HTML
     _closeOverlay, _doBank, _doPlayProperty, _doPlayHouseHotel, _doPassGo, _doRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,
