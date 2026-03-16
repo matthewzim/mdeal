@@ -54,9 +54,10 @@ function rentAmount(player: any, color: string) {
   const table = RENT_VALUES[color];
   if (!table || count === 0) return 0;
   let rent = table[Math.min(count, table.length) - 1];
-  // Add house bonus (3M each) and hotel bonus (4M each)
+  // Add house bonus (3M each), hotel bonus (4M each), shack bonus (5M each)
   rent += player.properties.filter((c: any) => c.actionType === 'house' && c.attachedColor === color).length * 3;
   rent += player.properties.filter((c: any) => c.actionType === 'hotel' && c.attachedColor === color).length * 4;
+  rent += player.properties.filter((c: any) => c.actionType === 'shack' && c.attachedColor === color).length * 5;
   return rent;
 }
 
@@ -117,7 +118,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const { gameId, action, cardId, targetColor, targetId, targetCardId,
-            myCardId, doubleCardId, chosenColor } = body;
+            myCardId, doubleCardId, chosenColor, cardType } = body;
 
     // Auth
     const authHeader = req.headers.get("Authorization");
@@ -480,6 +481,213 @@ serve(async (req) => {
       state.log.push({ type: 'move_wild', player: playerId, card: card.name, color: chosenColor });
 
       await saveState(supabase, gameId, state);
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Shack ──
+    if (action === 'play_shack') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'shack') return fail("Not a Shack card");
+      if (!targetColor) return fail("Must specify a target color");
+      if (!isSetComplete(player, targetColor)) return fail("Can only add Shack to a complete set");
+
+      const removed = removeFromHand(player, cardId);
+      removed.attachedColor = targetColor;
+      player.properties.push(removed);
+      state.turnPlaysRemaining--;
+      state.log.push({ type: 'play_shack', player: playerId, color: targetColor });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'play_shack', { cardId, targetColor });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Pass Go (draw until 7) ──
+    if (action === 'nm_pass_go') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'nm_pass_go') return fail("Not a No Mercy Pass Go");
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+      const drawCount = Math.max(0, 7 - player.hand.length);
+      const drawn = drawCards(state, playerId, drawCount);
+      state.log.push({ type: 'nm_pass_go', player: playerId, drawn: drawn.length });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'nm_pass_go', { cardId });
+      return ok({ drawnCards: drawn, state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Rent (universal, all opponents) ──
+    if (action === 'nm_rent') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'nm_rent') return fail("Not a No Mercy Rent card");
+      if (!ALL_COLORS.includes(targetColor)) return fail("Invalid color");
+      if (countColor(player, targetColor) === 0) return fail("No properties of that color");
+
+      let playsNeeded = 1;
+      if (doubleCardId) {
+        const dc = player.hand.find((c: any) => c.id === doubleCardId);
+        if (!dc || dc.actionType !== 'double_rent') return fail("Invalid double rent card");
+        playsNeeded = 2;
+      }
+      if (state.turnPlaysRemaining < playsNeeded) return fail("Not enough plays");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      let rent = rentAmount(player, targetColor);
+      if (doubleCardId) {
+        const dc = removeFromHand(player, doubleCardId);
+        state.discardPile.push(dc);
+        state.turnPlaysRemaining--;
+        rent *= 2;
+      }
+
+      const targets = state.players.filter((p: any) => p.id !== playerId).map((p: any) => p.id);
+      state.pendingAction = {
+        type: 'nm_rent', from: playerId,
+        targets: targets.map((t: string) => ({ playerId: t, amount: rent, paid: false, cancelled: false })),
+        color: targetColor, amount: rent, doubled: !!doubleCardId,
+        respondQueue: [...targets],
+        currentResponder: targets[0] || null,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'nm_rent', player: playerId, color: targetColor, amount: rent, doubled: !!doubleCardId });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'nm_rent', { cardId, targetColor, doubleCardId });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Super Sly Deal ──
+    if (action === 'super_sly_deal') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'super_sly_deal') return fail("Not a Super Sly Deal");
+      if (!ALL_COLORS.includes(targetColor)) return fail("Invalid color");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      const affectedPlayers = state.players.filter((p: any) => p.id !== playerId && countColor(p, targetColor) > 0).map((p: any) => p.id);
+      state.pendingAction = {
+        type: 'super_sly_deal', from: playerId, targetColor,
+        respondQueue: [...affectedPlayers],
+        currentResponder: affectedPlayers[0] || null,
+        cancelledPlayers: [],
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'super_sly_deal', player: playerId, color: targetColor });
+
+      if (affectedPlayers.length === 0) {
+        state.pendingAction = null;
+        state.phase = 'play';
+      }
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'super_sly_deal', { cardId, targetColor });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Repossession ──
+    if (action === 'repossession') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'repossession') return fail("Not a Repossession");
+      if (targetId === playerId) return fail("Cannot target yourself");
+      const target = getPlayer(state, targetId);
+      if (!target) return fail("Target not found");
+      if (target.properties.length <= 1) return fail("Target must have more than 1 property");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      state.pendingAction = {
+        type: 'repossession', from: playerId, targetId,
+        respondQueue: [targetId], currentResponder: targetId, cancelled: false,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'repossession', player: playerId, target: targetId });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'repossession', { cardId, targetId });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Tough Luck ──
+    if (action === 'tough_luck') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'tough_luck') return fail("Not a Tough Luck");
+      if (targetId === playerId) return fail("Cannot target yourself");
+      if (!['property', 'money', 'action'].includes(cardType)) return fail("Invalid card type choice");
+      const target = getPlayer(state, targetId);
+      if (!target) return fail("Target not found");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      state.pendingAction = {
+        type: 'tough_luck', from: playerId, targetId, cardType,
+        respondQueue: [targetId], currentResponder: targetId, cancelled: false,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'tough_luck', player: playerId, target: targetId, cardType });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'tough_luck', { cardId, targetId, cardType });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Yoink ──
+    if (action === 'yoink') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'yoink') return fail("Not a Yoink");
+      if (targetId === playerId) return fail("Cannot target yourself");
+      const target = getPlayer(state, targetId);
+      if (!target) return fail("Target not found");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      state.pendingAction = {
+        type: 'yoink', from: playerId,
+        targets: [{ playerId: targetId, amount: 10, paid: false, cancelled: false }],
+        respondQueue: [targetId], currentResponder: targetId,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'yoink', player: playerId, target: targetId });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'yoink', { cardId, targetId });
+      return ok({ state: playerView(state, playerId) });
+    }
+
+    // ── No Mercy: Unfair Trade ──
+    if (action === 'unfair_trade') {
+      const card = player.hand.find((c: any) => c.id === cardId);
+      if (!card || card.actionType !== 'unfair_trade') return fail("Not an Unfair Trade");
+      if (targetId === playerId) return fail("Cannot target yourself");
+      const target = getPlayer(state, targetId);
+      if (!target) return fail("Target not found");
+      if (player.bank.length === 0) return fail("Cannot play Unfair Trade with empty bank");
+
+      const removed = removeFromHand(player, cardId);
+      state.discardPile.push(removed);
+      state.turnPlaysRemaining--;
+
+      state.pendingAction = {
+        type: 'unfair_trade', from: playerId, targetId,
+        respondQueue: [targetId], currentResponder: targetId, cancelled: false,
+      };
+      state.phase = 'respond';
+      state.log.push({ type: 'unfair_trade', player: playerId, target: targetId });
+
+      await saveState(supabase, gameId, state);
+      await recordMove(supabase, gameId, playerId, 'unfair_trade', { cardId, targetId });
       return ok({ state: playerView(state, playerId) });
     }
 

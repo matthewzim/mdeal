@@ -116,8 +116,68 @@ function buildFullDeck() {
   return d;
 }
 
-function createInitialState(playerIds: string[]) {
-  const deck = shuffleDeck(buildFullDeck());
+function buildNoMercyDeck() {
+  _cid = 0;
+  const d: any[] = [];
+  const prop = (color: string, name: string, value: number) =>
+    ({ id: nid(), type: 'property', color, name, value });
+  const wild = (colors: string[], name: string, value: number) =>
+    ({ id: nid(), type: 'wild_property', colors, name, value, currentColor: colors[0] });
+  const money = (value: number) =>
+    ({ id: nid(), type: 'money', name: value + 'M', value });
+  const action = (actionType: string, name: string, value: number) =>
+    ({ id: nid(), type: 'action', actionType, name, value });
+
+  // Properties (same as regular)
+  d.push(prop('brown','Mediterranean Ave',1), prop('brown','Baltic Ave',1));
+  d.push(prop('darkblue','Park Place',4), prop('darkblue','Boardwalk',4));
+  d.push(prop('lightblue','Oriental Ave',1), prop('lightblue','Vermont Ave',1), prop('lightblue','Connecticut Ave',1));
+  d.push(prop('pink','St. Charles Place',2), prop('pink','Virginia Ave',2), prop('pink','States Ave',2));
+  d.push(prop('orange','St. James Place',2), prop('orange','Tennessee Ave',2), prop('orange','New York Ave',2));
+  d.push(prop('red','Kentucky Ave',3), prop('red','Indiana Ave',3), prop('red','Illinois Ave',3));
+  d.push(prop('yellow','Atlantic Ave',3), prop('yellow','Ventnor Ave',3), prop('yellow','Marvin Gardens',3));
+  d.push(prop('green','Pacific Ave',4), prop('green','North Carolina Ave',4), prop('green','Pennsylvania Ave',4));
+  d.push(prop('railroad','Reading Railroad',2), prop('railroad','Pennsylvania Railroad',2),
+         prop('railroad','B&O Railroad',2), prop('railroad','Short Line',2));
+  d.push(prop('utility','Electric Company',2), prop('utility','Water Works',2));
+
+  // Wild properties
+  d.push(wild(['brown','lightblue'],'Wild: Brown/Light Blue',1));
+  d.push(wild(['darkblue','green'],'Wild: Dark Blue/Green',4));
+  d.push(wild(['lightblue','railroad'],'Wild: Light Blue/Railroad',4));
+  d.push(wild(['pink','orange'],'Wild: Pink/Orange',2));
+  d.push(wild(['railroad','utility'],'Wild: Railroad/Utility',2));
+  d.push(wild(['railroad','green'],'Wild: Railroad/Green',4));
+  d.push(wild(['red','yellow'],'Wild: Red/Yellow',3));
+  d.push(wild(['red','yellow'],'Wild: Red/Yellow',3));
+  d.push(wild(['all'],'Wild Property',0));
+  d.push(wild(['all'],'Wild Property',0));
+
+  // Money (No Mercy: no 3M, add 15M)
+  for (let i=0;i<6;i++) d.push(money(1));
+  for (let i=0;i<5;i++) d.push(money(2));
+  for (let i=0;i<3;i++) d.push(money(4));
+  for (let i=0;i<2;i++) d.push(money(5));
+  d.push(money(10));
+  d.push(money(15));
+
+  // No Mercy Actions
+  for (let i=0;i<8;i++) d.push(action('nm_pass_go','Pass Go',1));
+  for (let i=0;i<6;i++) d.push(action('nm_rent','Rent',1));
+  for (let i=0;i<3;i++) d.push(action('double_rent','Double The Rent',1));
+  for (let i=0;i<3;i++) d.push(action('just_say_no','Just Say No',4));
+  for (let i=0;i<3;i++) d.push(action('shack','Shack',3));
+  for (let i=0;i<2;i++) d.push(action('super_sly_deal','Super Sly Deal',5));
+  for (let i=0;i<2;i++) d.push(action('repossession','Repossession',4));
+  for (let i=0;i<3;i++) d.push(action('tough_luck','Tough Luck',3));
+  for (let i=0;i<3;i++) d.push(action('yoink','Yoink',4));
+  for (let i=0;i<2;i++) d.push(action('unfair_trade','Unfair Trade',3));
+
+  return d;
+}
+
+function createInitialState(playerIds: string[], gameMode: string = 'regular') {
+  const deck = shuffleDeck(gameMode === 'nomercy' ? buildNoMercyDeck() : buildFullDeck());
   const players = playerIds.map(id => ({
     id, hand: [] as any[], bank: [] as any[], properties: [] as any[],
   }));
@@ -131,6 +191,7 @@ function createInitialState(playerIds: string[]) {
     winner: null,
     log: [],
     turnDrawn: false,
+    gameMode,
   };
 
   // Deal 5 cards each
@@ -156,7 +217,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { roomId } = await req.json();
+    const { roomId, gameMode } = await req.json();
 
     // Auth
     const authHeader = req.headers.get("Authorization");
@@ -229,7 +290,7 @@ serve(async (req) => {
 
     // Create game state
     const playerIds = roomPlayers.map((rp: any) => rp.player_id);
-    const gameState = createInitialState(playerIds);
+    const gameState = createInitialState(playerIds, gameMode || 'regular');
 
     // Insert game
     const { data: game, error: gameError } = await supabase

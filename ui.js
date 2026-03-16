@@ -167,6 +167,21 @@ const UI = (() => {
   // ── Login screen ─────────────────────────────────────────────────────
 
   function initLoginHandlers() {
+    // Game mode toggle
+    document.querySelectorAll('.game-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.game-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        ClientGame.setGameMode(mode);
+        if (mode === 'nomercy') {
+          document.body.classList.add('nomercy-mode');
+        } else {
+          document.body.classList.remove('nomercy-mode');
+        }
+      });
+    });
+
     // Public/Private toggle
     const toggleInput = document.getElementById('toggle-public-input');
     const toggleLabel = document.getElementById('toggle-label');
@@ -757,6 +772,15 @@ const UI = (() => {
       case 'end_turn': return `${n(entry.player)} ended their turn`;
       case 'win': return `🏆 ${n(entry.player)} WINS! 🏆`;
       case 'move_wild': return `${n(entry.player)} moved ${entry.card} to ${COLOR_LABELS[entry.color] || entry.color}`;
+      // No Mercy log types
+      case 'play_shack': return `${n(entry.player)} placed a Shack on ${COLOR_LABELS[entry.color] || entry.color} (+5M rent)`;
+      case 'nm_pass_go': return `${n(entry.player)} played Pass Go, drew until 7 in hand`;
+      case 'nm_rent': return `${n(entry.player)} charged ${entry.amount}M rent for ${COLOR_LABELS[entry.color] || entry.color} (all opponents)${entry.doubled ? ' (doubled!)' : ''}`;
+      case 'super_sly_deal': return `${n(entry.player)} played Super Sly Deal — stealing all ${COLOR_LABELS[entry.color] || entry.color} from everyone!`;
+      case 'repossession': return `${n(entry.player)} played Repossession on ${n(entry.target)}`;
+      case 'tough_luck': return `${n(entry.player)} played Tough Luck on ${n(entry.target)} — stealing all ${entry.cardType} cards`;
+      case 'yoink': return `${n(entry.player)} played Yoink on ${n(entry.target)} — stealing 10M!`;
+      case 'unfair_trade': return `${n(entry.player)} played Unfair Trade — swapped banks with ${n(entry.target)}!`;
       default: return JSON.stringify(entry);
     }
   }
@@ -943,6 +967,12 @@ const UI = (() => {
       case 'sly_deal': return `${n(pending.from)} wants to steal one of your properties!`;
       case 'forced_deal': return `${n(pending.from)} wants to swap properties with you!`;
       case 'deal_breaker': return `${n(pending.from)} wants to steal your complete ${COLOR_LABELS[pending.targetColor] || pending.targetColor} set!`;
+      case 'nm_rent': return `${n(pending.from)} charged ${pending.amount}M rent for ${COLOR_LABELS[pending.color] || pending.color} (all opponents)`;
+      case 'super_sly_deal': return `${n(pending.from)} is stealing all your ${COLOR_LABELS[pending.targetColor] || pending.targetColor} properties!`;
+      case 'repossession': return `${n(pending.from)} played Repossession — you must give up all but 1 property!`;
+      case 'tough_luck': return `${n(pending.from)} played Tough Luck — stealing all ${pending.cardType || 'selected'} cards from your hand!`;
+      case 'yoink': return `${n(pending.from)} played Yoink — stealing 10M from your bank!`;
+      case 'unfair_trade': return `${n(pending.from)} played Unfair Trade — swapping banks with you!`;
       default: return `${n(pending.from)} played an action against you.`;
     }
   }
@@ -955,6 +985,12 @@ const UI = (() => {
       case 'sly_deal': return 'Sly Deal';
       case 'forced_deal': return 'Forced Deal';
       case 'deal_breaker': return 'Deal Breaker';
+      case 'nm_rent': return pending.doubled ? 'Double Rent!' : 'Rent (All)';
+      case 'super_sly_deal': return 'Super Sly Deal';
+      case 'repossession': return 'Repossession';
+      case 'tough_luck': return 'Tough Luck';
+      case 'yoink': return 'Yoink!';
+      case 'unfair_trade': return 'Unfair Trade';
       default: return 'Action in Progress';
     }
   }
@@ -968,6 +1004,12 @@ const UI = (() => {
       case 'sly_deal': return `${n(pending.from)} is stealing a property`;
       case 'forced_deal': return `${n(pending.from)} is swapping properties`;
       case 'deal_breaker': return `${n(pending.from)} is stealing a complete ${COLOR_LABELS[pending.targetColor] || pending.targetColor} set`;
+      case 'nm_rent': return `${n(pending.from)} charged ${pending.amount}M rent for ${COLOR_LABELS[pending.color] || pending.color} (all opponents)${pending.doubled ? ' (doubled!)' : ''}`;
+      case 'super_sly_deal': return `${n(pending.from)} is stealing all ${COLOR_LABELS[pending.targetColor] || pending.targetColor} properties from everyone`;
+      case 'repossession': return `${n(pending.from)} played Repossession — target must give up all but 1 property`;
+      case 'tough_luck': return `${n(pending.from)} is stealing all ${pending.cardType || 'selected'} cards from a player's hand`;
+      case 'yoink': return `${n(pending.from)} is stealing 10M from a player's bank`;
+      case 'unfair_trade': return `${n(pending.from)} is swapping banks with another player`;
       default: return `${n(pending.from)} played an action`;
     }
   }
@@ -1158,6 +1200,119 @@ const UI = (() => {
           }
           break;
         }
+
+        // ── No Mercy action cards ──
+
+        case 'shack': {
+          // Shack can be placed on any set (including railroad/utility)
+          const completedForShack = getCompletedSetColors(player);
+          if (completedForShack.length > 0) {
+            html += `<div class="color-picker"><p>Add Shack to set (+5M rent):</p>`;
+            for (const color of completedForShack) {
+              html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doShack('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+            }
+            html += `</div>`;
+          } else {
+            html += `<p class="card-detail">No complete sets to place a Shack on</p>`;
+          }
+          break;
+        }
+
+        case 'nm_pass_go':
+          html += `<button class="btn btn-action" onclick="UI._doNmPassGo('${card.id}')">Play: Draw until 7 in hand</button>`;
+          break;
+
+        case 'nm_rent': {
+          html += `<div class="color-picker"><p>Charge rent for (all opponents):</p>`;
+          for (const color of Object.keys(COLOR_MAP)) {
+            if (countPlayerColor(player, color) > 0) {
+              html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doNmRent('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+            }
+          }
+          html += `</div>`;
+          break;
+        }
+
+        case 'super_sly_deal': {
+          // Pick a color to steal from all opponents
+          const colorsInPlay = [];
+          for (const p of state.players) {
+            if (p.id === player.id) continue;
+            for (const color of Object.keys(COLOR_MAP)) {
+              if (countPlayerColor(p, color) > 0 && !colorsInPlay.includes(color)) {
+                colorsInPlay.push(color);
+              }
+            }
+          }
+          if (colorsInPlay.length > 0) {
+            html += `<div class="color-picker"><p>Steal ALL of one color from every player:</p>`;
+            for (const color of colorsInPlay) {
+              html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doSuperSlyDeal('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+            }
+            html += `</div>`;
+          } else {
+            html += `<p class="card-detail">No opponents have any properties to steal</p>`;
+          }
+          break;
+        }
+
+        case 'repossession': {
+          html += `<div class="target-picker"><p>Choose player (they give all but 1 property):</p>`;
+          for (const p of state.players) {
+            if (p.id === player.id) continue;
+            if (p.properties.length <= 1) continue;
+            const name = ClientGame.getPlayerNames()[p.id] || 'Unknown';
+            html += `<button class="btn btn-target" onclick="UI._doRepossession('${card.id}', '${p.id}')">${escapeHtml(name)} (${p.properties.length} props)</button>`;
+          }
+          html += `</div>`;
+          break;
+        }
+
+        case 'tough_luck': {
+          html += `<div class="target-picker"><p>Choose a player, then steal all of one card type from their hand:</p>`;
+          for (const p of state.players) {
+            if (p.id === player.id) continue;
+            const handCount = p.hand?.length || p.handSize || 0;
+            if (handCount === 0) continue;
+            const name = ClientGame.getPlayerNames()[p.id] || 'Unknown';
+            html += `<div class="target-group"><strong>${escapeHtml(name)} (${handCount} cards)</strong>`;
+            html += `<button class="btn btn-sm" onclick="UI._doToughLuck('${card.id}', '${p.id}', 'property')">Properties</button>`;
+            html += `<button class="btn btn-sm" onclick="UI._doToughLuck('${card.id}', '${p.id}', 'money')">Money</button>`;
+            html += `<button class="btn btn-sm" onclick="UI._doToughLuck('${card.id}', '${p.id}', 'action')">Actions</button>`;
+            html += `</div>`;
+          }
+          html += `</div>`;
+          break;
+        }
+
+        case 'yoink': {
+          html += `<div class="target-picker"><p>Steal 10M from:</p>`;
+          for (const p of state.players) {
+            if (p.id === player.id) continue;
+            const bankTotal = p.bank?.reduce((s, c) => s + c.value, 0) || 0;
+            const name = ClientGame.getPlayerNames()[p.id] || 'Unknown';
+            html += `<button class="btn btn-target" onclick="UI._doYoink('${card.id}', '${p.id}')">${escapeHtml(name)} (${bankTotal}M bank)</button>`;
+          }
+          html += `</div>`;
+          break;
+        }
+
+        case 'unfair_trade': {
+          const myBankTotal = player.bank.reduce((s, c) => s + c.value, 0);
+          if (myBankTotal === 0) {
+            html += `<p class="card-detail">Cannot play: your bank is empty!</p>`;
+          } else {
+            html += `<div class="target-picker"><p>Swap your bank (${myBankTotal}M) with:</p>`;
+            for (const p of state.players) {
+              if (p.id === player.id) continue;
+              const theirBank = p.bank?.reduce((s, c) => s + c.value, 0) || 0;
+              const name = ClientGame.getPlayerNames()[p.id] || 'Unknown';
+              html += `<button class="btn btn-target" onclick="UI._doUnfairTrade('${card.id}', '${p.id}')">${escapeHtml(name)} (${theirBank}M bank)</button>`;
+            }
+            html += `</div>`;
+          }
+          break;
+        }
       }
     }
 
@@ -1324,6 +1479,56 @@ const UI = (() => {
     await ClientGame.playDealBreaker(cardId, targetId, targetColor);
   }
 
+  // ── No Mercy action handlers ──
+
+  async function _doShack(cardId, targetColor) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playShack(cardId, targetColor);
+  }
+
+  async function _doNmPassGo(cardId) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playNmPassGo(cardId);
+  }
+
+  async function _doNmRent(cardId, targetColor) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playNmRent(cardId, targetColor, null);
+  }
+
+  async function _doSuperSlyDeal(cardId, targetColor) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playSuperSlyDeal(cardId, targetColor);
+  }
+
+  async function _doRepossession(cardId, targetId) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playRepossession(cardId, targetId);
+  }
+
+  async function _doToughLuck(cardId, targetId, cardType) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playToughLuck(cardId, targetId, cardType);
+  }
+
+  async function _doYoink(cardId, targetId) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playYoink(cardId, targetId);
+  }
+
+  async function _doUnfairTrade(cardId, targetId) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playUnfairTrade(cardId, targetId);
+  }
+
   async function _handleAccept() {
     _closeOverlay();
     await ClientGame.respondAccept();
@@ -1464,8 +1669,75 @@ const UI = (() => {
     'railroad,utility': 'rent-black-and-utility.png',
   };
 
+  // No Mercy card image overrides (maps card names to nomercy/ folder files)
+  const NM_CARD_IMAGE_MAP = {
+    // Properties (same names, nomercy art)
+    'Mediterranean Ave': 'mediterranean.png',
+    'Baltic Ave': 'baltic.png',
+    'Oriental Ave': 'oriental.png',
+    'Vermont Ave': 'vermont.png',
+    'Connecticut Ave': 'connecticut.png',
+    'St. Charles Place': 'st-charles.png',
+    'Virginia Ave': 'virginia.png',
+    'States Ave': 'states.png',
+    'St. James Place': 'st-james.png',
+    'Tennessee Ave': 'tennessee.png',
+    'New York Ave': 'new-york.png',
+    'Kentucky Ave': 'kentucky.png',
+    'Indiana Ave': 'indiana.png',
+    'Illinois Ave': 'illinois.png',
+    'Atlantic Ave': 'atlantic.png',
+    'Ventnor Ave': 'ventnor.png',
+    'Marvin Gardens': 'marvin.png',
+    'Pacific Ave': 'pacific.png',
+    'North Carolina Ave': 'north-carolina.png',
+    'Pennsylvania Ave': 'pennsylvania-avenue.png',
+    'Reading Railroad': 'reading.png',
+    'Pennsylvania Railroad': 'pennsylvania.png',
+    'B&O Railroad': 'b-and-o.png',
+    'Short Line': 'short-line.png',
+    'Electric Company': 'electric.png',
+    'Water Works': 'water.png',
+    // Wild property cards
+    'Wild: Brown/Light Blue': 'wildcard-light-blue-and-brown.png',
+    'Wild: Dark Blue/Green': 'wildcard-dark-blue-and-green.png',
+    'Wild: Light Blue/Railroad': 'wildcard-light-blue-and-black.png',
+    'Wild: Pink/Orange': 'wildcard-orange-and-pink.png',
+    'Wild: Railroad/Utility': 'wildcard-utility-and-black.png',
+    'Wild: Railroad/Green': 'wildcard-green-and-black.png',
+    'Wild: Red/Yellow': 'wild-red-and-yellow.png',
+    'Wild Property': 'wild-property.png',
+    // Action cards
+    'Pass Go': 'pass-go.png',
+    'Double The Rent': 'double-rent.png',
+    'Just Say No': 'say-no.png',
+    'Rent': 'rent.png',
+    'Shack': 'shack.png',
+    'Super Sly Deal': 'super-sly-deal.png',
+    'Repossession': 'repossession.png',
+    'Tough Luck': 'tough-luck.png',
+    'Yoink': 'yoink.png',
+    'Unfair Trade': 'unfair-trade.png',
+  };
+
+  function _isNoMercyMode() {
+    const state = ClientGame.getGameState();
+    return state?.gameMode === 'nomercy' || ClientGame.getGameMode() === 'nomercy';
+  }
+
   function getCardImagePath(card) {
     if (!card || !card.name) return null;
+
+    // No Mercy mode: use nomercy/ folder
+    if (_isNoMercyMode()) {
+      if (NM_CARD_IMAGE_MAP[card.name]) return 'assets/cards/nomercy/' + NM_CARD_IMAGE_MAP[card.name];
+      // Money cards
+      if (card.type === 'money') return 'assets/cards/nomercy/' + card.value + 'M.png';
+      // NM rent is universal (no rentColors)
+      if (card.actionType === 'nm_rent') return 'assets/cards/nomercy/rent.png';
+      // Fall through to regular mapping for any missing nomercy assets
+    }
+
     // Check direct name match
     if (CARD_IMAGE_MAP[card.name]) return 'assets/cards/' + CARD_IMAGE_MAP[card.name];
     // Money cards by value
@@ -1670,7 +1942,7 @@ const UI = (() => {
   }
 
   function isCardInCompletedSet(player, card) {
-    if (card.actionType === 'house' || card.actionType === 'hotel') {
+    if (card.actionType === 'house' || card.actionType === 'hotel' || card.actionType === 'shack') {
       return card.attachedColor ? countPlayerColor(player, card.attachedColor) >= getSetRequirement(card.attachedColor) : false;
     }
     const color = card.type === 'wild_property' ? card.currentColor : card.color;
@@ -1849,5 +2121,8 @@ const UI = (() => {
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,
     _doForcedDeal, _doDealBreaker, _handleAccept, _handleJSN,
     _togglePaymentCard, _confirmPayment, _doSwitchWild,
+    // No Mercy action handlers
+    _doShack, _doNmPassGo, _doNmRent, _doSuperSlyDeal,
+    _doRepossession, _doToughLuck, _doYoink, _doUnfairTrade,
   };
 })();

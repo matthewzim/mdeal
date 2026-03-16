@@ -126,9 +126,15 @@ serve(async (req) => {
       state.discardPile.push(card);
 
       // Toggle cancellation
-      if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday') {
+      if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday' || pending.type === 'nm_rent' || pending.type === 'yoink') {
         const target = pending.targets.find((t: any) => t.playerId === playerId);
         if (target) target.cancelled = !target.cancelled;
+      } else if (pending.type === 'super_sly_deal') {
+        // Track per-player cancellation
+        if (!pending.cancelledPlayers) pending.cancelledPlayers = [];
+        const idx = pending.cancelledPlayers.indexOf(playerId);
+        if (idx === -1) pending.cancelledPlayers.push(playerId);
+        else pending.cancelledPlayers.splice(idx, 1);
       } else {
         pending.cancelled = !pending.cancelled;
       }
@@ -163,7 +169,7 @@ serve(async (req) => {
         return fail("Not your turn to respond");
       }
 
-      if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday') {
+      if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday' || pending.type === 'nm_rent' || pending.type === 'yoink') {
         // Remove from respond queue
         const rIdx = pending.respondQueue.indexOf(playerId);
         if (rIdx !== -1) pending.respondQueue.splice(rIdx, 1);
@@ -191,6 +197,33 @@ serve(async (req) => {
             resolveAction(state);
           }
         }
+      } else if (pending.type === 'super_sly_deal') {
+        // Multi-target respond — remove from queue, advance
+        const rIdx = pending.respondQueue.indexOf(playerId);
+        if (rIdx !== -1) pending.respondQueue.splice(rIdx, 1);
+        if (pending.currentResponder === playerId) {
+          pending.currentResponder = pending.respondQueue[0] || null;
+        }
+        if (pending.respondQueue.length === 0 || pending.currentResponder === null) {
+          // Execute: steal all of targetColor from non-cancelled players
+          executeSuperSlyDeal(state);
+          resolveAction(state);
+        }
+      } else if (pending.type === 'repossession') {
+        if (!pending.cancelled) {
+          executeRepossession(state);
+        }
+        resolveAction(state);
+      } else if (pending.type === 'tough_luck') {
+        if (!pending.cancelled) {
+          executeToughLuck(state);
+        }
+        resolveAction(state);
+      } else if (pending.type === 'unfair_trade') {
+        if (!pending.cancelled) {
+          executeUnfairTrade(state);
+        }
+        resolveAction(state);
       } else {
         // Single-target actions (sly deal, forced deal, deal breaker)
         if (!pending.cancelled) {
@@ -330,8 +363,8 @@ function executePropertyAction(state: any) {
     const setCards = target.properties.filter((c: any) => {
       if (c.type === 'property') return c.color === color;
       if (c.type === 'wild_property') return c.currentColor === color;
-      // Include houses/hotels attached to this color
-      if ((c.actionType === 'house' || c.actionType === 'hotel') && c.attachedColor === color) return true;
+      // Include houses/hotels/shacks attached to this color
+      if ((c.actionType === 'house' || c.actionType === 'hotel' || c.actionType === 'shack') && c.attachedColor === color) return true;
       return false;
     });
     for (const card of setCards) {
@@ -342,6 +375,85 @@ function executePropertyAction(state: any) {
       }
     }
   }
+}
+
+function executeSuperSlyDeal(state: any) {
+  const pending = state.pendingAction;
+  const from = getPlayer(state, pending.from);
+  const color = pending.targetColor;
+  const cancelled = pending.cancelledPlayers || [];
+
+  for (const p of state.players) {
+    if (p.id === pending.from) continue;
+    if (cancelled.includes(p.id)) continue;
+    const toSteal = p.properties.filter((c: any) => {
+      if (c.type === 'property') return c.color === color;
+      if (c.type === 'wild_property') return c.currentColor === color;
+      if ((c.actionType === 'house' || c.actionType === 'hotel' || c.actionType === 'shack') && c.attachedColor === color) return true;
+      return false;
+    });
+    for (const card of toSteal) {
+      const idx = p.properties.indexOf(card);
+      if (idx !== -1) {
+        p.properties.splice(idx, 1);
+        from.properties.push(card);
+      }
+    }
+  }
+}
+
+function executeRepossession(state: any) {
+  const pending = state.pendingAction;
+  const target = getPlayer(state, pending.targetId);
+  if (!target || target.properties.length <= 1) return;
+
+  // Target keeps most valuable property, rest distributed round-robin
+  const sorted = [...target.properties].sort((a: any, b: any) => b.value - a.value);
+  const keep = sorted[0];
+  const toDistribute = sorted.slice(1);
+
+  target.properties = [keep];
+
+  const others = state.players.filter((p: any) => p.id !== pending.targetId);
+  if (others.length === 0) return;
+
+  let idx = 0;
+  for (const card of toDistribute) {
+    others[idx % others.length].properties.push(card);
+    idx++;
+  }
+}
+
+function executeToughLuck(state: any) {
+  const pending = state.pendingAction;
+  const from = getPlayer(state, pending.from);
+  const target = getPlayer(state, pending.targetId);
+  if (!target) return;
+
+  const cardType = pending.cardType;
+  const stolen: any[] = [];
+  target.hand = target.hand.filter((c: any) => {
+    if (c.type === cardType || (cardType === 'action' && c.type === 'action') ||
+        (cardType === 'property' && (c.type === 'property' || c.type === 'wild_property'))) {
+      stolen.push(c);
+      return false;
+    }
+    return true;
+  });
+  for (const card of stolen) {
+    from.hand.push(card);
+  }
+}
+
+function executeUnfairTrade(state: any) {
+  const pending = state.pendingAction;
+  const from = getPlayer(state, pending.from);
+  const target = getPlayer(state, pending.targetId);
+  if (!from || !target) return;
+
+  const temp = from.bank;
+  from.bank = target.bank;
+  target.bank = temp;
 }
 
 function resolveAction(state: any) {

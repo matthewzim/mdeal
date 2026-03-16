@@ -143,6 +143,53 @@ html, body {
   color: var(--gold);
 }
 
+/* ── Game Mode Toggle ──────────────────────────────────────────────── */
+
+.game-mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+.game-mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+}
+
+.game-mode-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+}
+
+.game-mode-btn.active[data-mode="regular"] {
+  background: var(--felt-green, #1a6b3c);
+  color: white;
+}
+
+.game-mode-btn.active[data-mode="nomercy"] {
+  background: #444;
+  color: #ff4444;
+  text-shadow: 0 0 8px rgba(255,68,68,0.4);
+}
+
+/* ── No Mercy Theme ───────────────────────────────────────────────── */
+
+body.nomercy-mode {
+  --felt-green: #333;
+  --felt-dark: #1a1a1a;
+  --felt-light: #3a3a3a;
+}
+
 .input-group {
   margin-bottom: 24px;
 }

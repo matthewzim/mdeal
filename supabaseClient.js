@@ -177,8 +177,8 @@ const SupabaseClient = (() => {
     return callFunction('joinRoom', { username, roomCode });
   }
 
-  async function startGame(roomId) {
-    return callFunction('startGame', { roomId });
+  async function startGame(roomId, gameMode) {
+    return callFunction('startGame', { roomId, gameMode });
   }
 
   async function playCard(gameId, action, params = {}) {
