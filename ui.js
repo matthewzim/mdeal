@@ -1056,14 +1056,20 @@ const UI = (() => {
           break;
 
         case 'rent':
-        case 'multi_rent':
-          const rentColors = card.actionType === 'multi_rent'
-            ? Object.keys(COLOR_MAP)
-            : card.rentColors;
           html += `<div class="color-picker"><p>Charge rent for:</p>`;
-          for (const color of rentColors) {
+          for (const color of card.rentColors) {
             if (countPlayerColor(player, color) > 0) {
               html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doRent('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
+            }
+          }
+          html += `</div>`;
+          break;
+
+        case 'multi_rent':
+          html += `<div class="color-picker"><p>Charge rent for:</p>`;
+          for (const color of Object.keys(COLOR_MAP)) {
+            if (countPlayerColor(player, color) > 0) {
+              html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._showMultiRentTargetPicker('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
             }
           }
           html += `</div>`;
@@ -1243,6 +1249,33 @@ const UI = (() => {
     _closeOverlay();
     // TODO: support double rent selection
     await ClientGame.playRent(cardId, targetColor, null);
+  }
+
+  function _showMultiRentTargetPicker(cardId, targetColor) {
+    const state = ClientGame.getGameState();
+    const myId = ClientGame.getPlayerId();
+    const names = ClientGame.getPlayerNames();
+    const overlay = document.getElementById('action-overlay');
+
+    let html = `<div class="action-modal card-action-modal">`;
+    html += `<h3>Multi Rent: ${COLOR_LABELS[targetColor]}</h3>`;
+    html += `<div class="target-picker"><p>Charge rent to:</p>`;
+    for (const p of state.players) {
+      if (p.id === myId) continue;
+      const name = names[p.id] || 'Unknown';
+      html += `<button class="btn btn-target" onclick="UI._doMultiRent('${cardId}', '${targetColor}', '${p.id}')">${escapeHtml(name)}</button>`;
+    }
+    html += `</div>`;
+    html += `<button class="btn btn-cancel" onclick="UI._closeOverlay()">Cancel</button>`;
+    html += `</div>`;
+
+    overlay.innerHTML = html;
+  }
+
+  async function _doMultiRent(cardId, targetColor, targetId) {
+    _showMyPlayedCard(cardId);
+    _closeOverlay();
+    await ClientGame.playRent(cardId, targetColor, null, targetId);
   }
 
   async function _doDebtCollector(cardId, targetId) {
@@ -1812,6 +1845,7 @@ const UI = (() => {
     renderChatMessages, sendChat, updateStatsDashboard,
     // Exposed for onclick handlers in HTML
     _closeOverlay, _doBank, _doPlayProperty, _doPlayHouseHotel, _doPassGo, _doRent,
+    _showMultiRentTargetPicker, _doMultiRent,
     _doDebtCollector, _doBirthday, _doSlyDeal, _startForcedDeal,
     _doForcedDeal, _doDealBreaker, _handleAccept, _handleJSN,
     _togglePaymentCard, _confirmPayment, _doSwitchWild,

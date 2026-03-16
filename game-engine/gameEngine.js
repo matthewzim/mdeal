@@ -219,7 +219,7 @@ const GameEngine = {
     return { drawn };
   },
 
-  playRent(state, playerId, cardId, targetColor, doubleCardId) {
+  playRent(state, playerId, cardId, targetColor, doubleCardId, targetPlayerId) {
     if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);
     const card = this.removeFromHand(player, cardId);
@@ -240,10 +240,8 @@ const GameEngine = {
     // Determine targets
     let targets;
     if (card.actionType === ACTION_TYPE.MULTI_RENT) {
-      // Multi rent: choose one player (handled by passing targetPlayerId in move data)
-      // For simplicity, multi rent charges all players like regular rent
-      // The spec says "wild rent" — we'll charge all opponents
-      targets = state.players.filter(p => p.id !== playerId).map(p => p.id);
+      // Multi rent: charge only the chosen player
+      targets = [targetPlayerId];
     } else {
       // Standard rent: all opponents
       targets = state.players.filter(p => p.id !== playerId).map(p => p.id);

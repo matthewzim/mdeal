@@ -287,7 +287,17 @@ serve(async (req) => {
         rent *= 2;
       }
 
-      const targets = state.players.filter((p: any) => p.id !== playerId).map((p: any) => p.id);
+      let targets;
+      if (card.actionType === 'multi_rent') {
+        // Multi rent: charge only the chosen target player
+        if (!targetId) return fail("Must choose a target player for Multi Rent");
+        if (targetId === playerId) return fail("Cannot target yourself");
+        if (!getPlayer(state, targetId)) return fail("Target player not found");
+        targets = [targetId];
+      } else {
+        // Standard rent: all opponents
+        targets = state.players.filter((p: any) => p.id !== playerId).map((p: any) => p.id);
+      }
       state.pendingAction = {
         type: 'rent', from: playerId,
         targets: targets.map((t: string) => ({ playerId: t, amount: rent, paid: false, cancelled: false })),

@@ -145,7 +145,7 @@ const Rules = {
     return { valid: true };
   },
 
-  validateRent(state, playerId, cardId, targetColor, doubleCardId) {
+  validateRent(state, playerId, cardId, targetColor, doubleCardId, targetPlayerId) {
     const player = this.getPlayer(state, playerId);
     if (!player) return { valid: false, reason: 'Player not found' };
     if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
@@ -161,6 +161,10 @@ const Rules = {
       if (!Object.values(COLORS).includes(targetColor)) {
         return { valid: false, reason: 'Invalid color' };
       }
+      // Multi rent requires choosing a single target player
+      if (!targetPlayerId) return { valid: false, reason: 'Must choose a target player for Multi Rent' };
+      if (targetPlayerId === playerId) return { valid: false, reason: 'Cannot target yourself' };
+      if (!this.getPlayer(state, targetPlayerId)) return { valid: false, reason: 'Target player not found' };
     } else {
       return { valid: false, reason: 'Not a rent card' };
     }
