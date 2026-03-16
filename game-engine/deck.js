@@ -60,6 +60,15 @@ const ACTION_TYPE = {
   JUST_SAY_NO: 'just_say_no',
   HOUSE: 'house',
   HOTEL: 'hotel',
+  // No Mercy action types
+  SHACK: 'shack',
+  SUPER_SLY_DEAL: 'super_sly_deal',
+  REPOSSESSION: 'repossession',
+  TOUGH_LUCK: 'tough_luck',
+  YOINK: 'yoink',
+  UNFAIR_TRADE: 'unfair_trade',
+  NM_PASS_GO: 'nm_pass_go',
+  NM_RENT: 'nm_rent',
 };
 
 let _cardIdCounter = 0;
@@ -294,6 +303,119 @@ function buildFullDeck() {
   return deck;
 }
 
+function buildNoMercyDeck() {
+  resetCardIds();
+  const deck = [];
+
+  // === PROPERTY CARDS (same as regular) ===
+  deck.push(createPropertyCard(COLORS.BROWN, 'Mediterranean Ave', 1));
+  deck.push(createPropertyCard(COLORS.BROWN, 'Baltic Ave', 1));
+  deck.push(createPropertyCard(COLORS.DARK_BLUE, 'Park Place', 4));
+  deck.push(createPropertyCard(COLORS.DARK_BLUE, 'Boardwalk', 4));
+  deck.push(createPropertyCard(COLORS.LIGHT_BLUE, 'Oriental Ave', 1));
+  deck.push(createPropertyCard(COLORS.LIGHT_BLUE, 'Vermont Ave', 1));
+  deck.push(createPropertyCard(COLORS.LIGHT_BLUE, 'Connecticut Ave', 1));
+  deck.push(createPropertyCard(COLORS.PINK, 'St. Charles Place', 2));
+  deck.push(createPropertyCard(COLORS.PINK, 'Virginia Ave', 2));
+  deck.push(createPropertyCard(COLORS.PINK, 'States Ave', 2));
+  deck.push(createPropertyCard(COLORS.ORANGE, 'St. James Place', 2));
+  deck.push(createPropertyCard(COLORS.ORANGE, 'Tennessee Ave', 2));
+  deck.push(createPropertyCard(COLORS.ORANGE, 'New York Ave', 2));
+  deck.push(createPropertyCard(COLORS.RED, 'Kentucky Ave', 3));
+  deck.push(createPropertyCard(COLORS.RED, 'Indiana Ave', 3));
+  deck.push(createPropertyCard(COLORS.RED, 'Illinois Ave', 3));
+  deck.push(createPropertyCard(COLORS.YELLOW, 'Atlantic Ave', 3));
+  deck.push(createPropertyCard(COLORS.YELLOW, 'Ventnor Ave', 3));
+  deck.push(createPropertyCard(COLORS.YELLOW, 'Marvin Gardens', 3));
+  deck.push(createPropertyCard(COLORS.GREEN, 'Pacific Ave', 4));
+  deck.push(createPropertyCard(COLORS.GREEN, 'North Carolina Ave', 4));
+  deck.push(createPropertyCard(COLORS.GREEN, 'Pennsylvania Ave', 4));
+  deck.push(createPropertyCard(COLORS.RAILROAD, 'Reading Railroad', 2));
+  deck.push(createPropertyCard(COLORS.RAILROAD, 'Pennsylvania Railroad', 2));
+  deck.push(createPropertyCard(COLORS.RAILROAD, 'B&O Railroad', 2));
+  deck.push(createPropertyCard(COLORS.RAILROAD, 'Short Line', 2));
+  deck.push(createPropertyCard(COLORS.UTILITY, 'Electric Company', 2));
+  deck.push(createPropertyCard(COLORS.UTILITY, 'Water Works', 2));
+
+  // === WILD PROPERTY CARDS ===
+  deck.push(createWildPropertyCard([COLORS.BROWN, COLORS.LIGHT_BLUE], 'Wild: Brown/Light Blue', 1));
+  deck.push(createWildPropertyCard([COLORS.DARK_BLUE, COLORS.GREEN], 'Wild: Dark Blue/Green', 4));
+  deck.push(createWildPropertyCard([COLORS.LIGHT_BLUE, COLORS.RAILROAD], 'Wild: Light Blue/Railroad', 4));
+  deck.push(createWildPropertyCard([COLORS.PINK, COLORS.ORANGE], 'Wild: Pink/Orange', 2));
+  deck.push(createWildPropertyCard([COLORS.RAILROAD, COLORS.UTILITY], 'Wild: Railroad/Utility', 2));
+  deck.push(createWildPropertyCard([COLORS.RAILROAD, COLORS.GREEN], 'Wild: Railroad/Green', 4));
+  deck.push(createWildPropertyCard([COLORS.RED, COLORS.YELLOW], 'Wild: Red/Yellow', 3));
+  deck.push(createWildPropertyCard([COLORS.RED, COLORS.YELLOW], 'Wild: Red/Yellow', 3));
+  deck.push(createWildPropertyCard(['all'], 'Wild Property', 0));
+  deck.push(createWildPropertyCard(['all'], 'Wild Property', 0));
+
+  // === MONEY CARDS (No Mercy: no 3M, add 15M) ===
+  for (let i = 0; i < 6; i++) deck.push(createMoneyCard(1));
+  for (let i = 0; i < 5; i++) deck.push(createMoneyCard(2));
+  for (let i = 0; i < 3; i++) deck.push(createMoneyCard(4));
+  for (let i = 0; i < 2; i++) deck.push(createMoneyCard(5));
+  deck.push(createMoneyCard(10));
+  deck.push(createMoneyCard(15));
+
+  // === NO MERCY ACTION CARDS ===
+  // Pass Go x8 (draw until 7 in hand)
+  for (let i = 0; i < 8; i++) {
+    deck.push(createActionCard(ACTION_TYPE.NM_PASS_GO, 'Pass Go', 1));
+  }
+
+  // Rent (universal, any color) x6
+  for (let i = 0; i < 6; i++) {
+    deck.push(createActionCard(ACTION_TYPE.NM_RENT, 'Rent', 1));
+  }
+
+  // Double The Rent x3
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.DOUBLE_RENT, 'Double The Rent', 1));
+  }
+
+  // Just Say No x3
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.JUST_SAY_NO, 'Just Say No', 4));
+  }
+
+  // Shack x3 (adds 5M to rent, can be placed on any set including railroad/utility)
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.SHACK, 'Shack', 3));
+  }
+
+  // Super Sly Deal x2 (steal all of one color from every player)
+  for (let i = 0; i < 2; i++) {
+    deck.push(createActionCard(ACTION_TYPE.SUPER_SLY_DEAL, 'Super Sly Deal', 5));
+  }
+
+  // Repossession x2 (target gives all but 1 property to others)
+  for (let i = 0; i < 2; i++) {
+    deck.push(createActionCard(ACTION_TYPE.REPOSSESSION, 'Repossession', 4));
+  }
+
+  // Tough Luck x3 (steal all of one type from a player's hand)
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.TOUGH_LUCK, 'Tough Luck', 3));
+  }
+
+  // Yoink x3 (steal 10M from a player)
+  for (let i = 0; i < 3; i++) {
+    deck.push(createActionCard(ACTION_TYPE.YOINK, 'Yoink', 4));
+  }
+
+  // Unfair Trade x2 (swap banks)
+  for (let i = 0; i < 2; i++) {
+    deck.push(createActionCard(ACTION_TYPE.UNFAIR_TRADE, 'Unfair Trade', 3));
+  }
+
+  return deck;
+}
+
+function buildDeck(gameMode) {
+  if (gameMode === 'nomercy') return buildNoMercyDeck();
+  return buildFullDeck();
+}
+
 function shuffleDeck(deck) {
   const arr = [...deck];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -307,12 +429,12 @@ function shuffleDeck(deck) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
-    buildFullDeck, shuffleDeck, resetCardIds,
+    buildFullDeck, buildNoMercyDeck, buildDeck, shuffleDeck, resetCardIds,
   };
 }
 if (typeof window !== 'undefined') {
   window.MonopolyDeck = {
     COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
-    buildFullDeck, shuffleDeck, resetCardIds,
+    buildFullDeck, buildNoMercyDeck, buildDeck, shuffleDeck, resetCardIds,
   };
 }

@@ -16,6 +16,7 @@ const ClientGame = (() => {
   let chatMessages = [];
   let chatSubscription = null;
   let roomIsPublic = false;
+  let gameMode = 'regular'; // 'regular' or 'nomercy'
 
   // ── Persistent Anonymous Player ID ──────────────────────────────────
   const PLAYER_ID_KEY = 'mdeal_player_id';
@@ -108,6 +109,8 @@ const ClientGame = (() => {
   // ── Room management ──────────────────────────────────────────────────
 
   function getRoomIsPublic() { return roomIsPublic; }
+  function getGameMode() { return gameMode; }
+  function setGameMode(mode) { gameMode = mode || 'regular'; }
 
   async function createRoom(name, isPublic) {
     roomIsPublic = !!isPublic;
@@ -157,7 +160,7 @@ const ClientGame = (() => {
   }
 
   async function startGame() {
-    const data = await SupabaseClient.startGame(roomId);
+    const data = await SupabaseClient.startGame(roomId, gameMode);
     gameId = data.gameId;
     return data;
   }
@@ -468,7 +471,7 @@ const ClientGame = (() => {
       playerNames[cpuId] = ComputerPlayer.COMPUTER_NAMES[i] || ('Bot ' + (i + 1));
     }
 
-    gameState = GameEngine.createInitialState(allIds);
+    gameState = GameEngine.createInitialState(allIds, gameMode);
     UI.showGameScreen();
     renderLocalGame();
   }
@@ -527,6 +530,15 @@ const ClientGame = (() => {
       respondAccept: () => localRespondAccept(),
       respondJustSayNo: (cardId) => localRespondJustSayNo(cardId),
       makePayment: (bankIds, propIds) => localMakePayment(bankIds, propIds),
+      // No Mercy actions
+      playShack: (cardId, targetColor) => localPlayShack(cardId, targetColor),
+      playNmPassGo: (cardId) => localPlayNmPassGo(cardId),
+      playNmRent: (cardId, color, doubleCardId) => localPlayNmRent(cardId, color, doubleCardId),
+      playSuperSlyDeal: (cardId, targetColor) => localPlaySuperSlyDeal(cardId, targetColor),
+      playRepossession: (cardId, targetId) => localPlayRepossession(cardId, targetId),
+      playToughLuck: (cardId, targetId, cardType) => localPlayToughLuck(cardId, targetId, cardType),
+      playYoink: (cardId, targetId) => localPlayYoink(cardId, targetId),
+      playUnfairTrade: (cardId, targetId) => localPlayUnfairTrade(cardId, targetId),
     };
   }
 
@@ -597,6 +609,55 @@ const ClientGame = (() => {
   function localPlayDealBreaker(cardId, targetId, targetColor) {
     _showCardBeforePlay(cardId);
     GameEngine.playDealBreaker(gameState, gameState.currentPlayer, cardId, targetId, targetColor);
+    renderLocalGame();
+  }
+
+  function localPlayShack(cardId, targetColor) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playShack(gameState, gameState.currentPlayer, cardId, targetColor);
+    renderLocalGame();
+  }
+
+  function localPlayNmPassGo(cardId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playNmPassGo(gameState, gameState.currentPlayer, cardId);
+    renderLocalGame();
+  }
+
+  function localPlayNmRent(cardId, targetColor, doubleCardId) {
+    _showCardBeforePlay(cardId);
+    if (doubleCardId) _showCardBeforePlay(doubleCardId);
+    GameEngine.playNmRent(gameState, gameState.currentPlayer, cardId, targetColor, doubleCardId || null);
+    renderLocalGame();
+  }
+
+  function localPlaySuperSlyDeal(cardId, targetColor) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playSuperSlyDeal(gameState, gameState.currentPlayer, cardId, targetColor);
+    renderLocalGame();
+  }
+
+  function localPlayRepossession(cardId, targetId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playRepossession(gameState, gameState.currentPlayer, cardId, targetId);
+    renderLocalGame();
+  }
+
+  function localPlayToughLuck(cardId, targetId, cardType) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playToughLuck(gameState, gameState.currentPlayer, cardId, targetId, cardType);
+    renderLocalGame();
+  }
+
+  function localPlayYoink(cardId, targetId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playYoink(gameState, gameState.currentPlayer, cardId, targetId);
+    renderLocalGame();
+  }
+
+  function localPlayUnfairTrade(cardId, targetId) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playUnfairTrade(gameState, gameState.currentPlayer, cardId, targetId);
     renderLocalGame();
   }
 
@@ -733,6 +794,96 @@ const ClientGame = (() => {
     }
   }
 
+  // ── No Mercy "Any" wrappers ──────────────────────────────────────────
+
+  async function playShackAny(cardId, targetColor) {
+    if (isLocalGame) {
+      localPlayShack(cardId, targetColor);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'play_shack', { cardId, targetColor });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playNmPassGoAny(cardId) {
+    if (isLocalGame) {
+      localPlayNmPassGo(cardId);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playNmRentAny(cardId, targetColor, doubleCardId) {
+    if (isLocalGame) {
+      localPlayNmRent(cardId, targetColor, doubleCardId);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'nm_rent', { cardId, targetColor, doubleCardId });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playSuperSlyDealAny(cardId, targetColor) {
+    if (isLocalGame) {
+      localPlaySuperSlyDeal(cardId, targetColor);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'super_sly_deal', { cardId, targetColor });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playRepossessionAny(cardId, targetId) {
+    if (isLocalGame) {
+      localPlayRepossession(cardId, targetId);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'repossession', { cardId, targetId });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playToughLuckAny(cardId, targetId, cardType) {
+    if (isLocalGame) {
+      localPlayToughLuck(cardId, targetId, cardType);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'tough_luck', { cardId, targetId, cardType });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playYoinkAny(cardId, targetId) {
+    if (isLocalGame) {
+      localPlayYoink(cardId, targetId);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'yoink', { cardId, targetId });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
+  async function playUnfairTradeAny(cardId, targetId) {
+    if (isLocalGame) {
+      localPlayUnfairTrade(cardId, targetId);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'unfair_trade', { cardId, targetId });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
   async function moveWildAny(cardId, chosenColor) {
     if (isLocalGame) {
       GameEngine.moveWild(gameState, playerId, cardId, chosenColor);
@@ -844,7 +995,7 @@ const ClientGame = (() => {
   return {
     setPlayer, getPlayerId, getUsername, getRoomId, getGameId,
     getGameState, getIsHost, getPlayerNames, isComputerGame,
-    getRoomIsPublic,
+    getRoomIsPublic, getGameMode, setGameMode,
     createRoom, joinRoom, joinPublicRoom, toggleReady, startGame, loadGame,
     refreshRoomPlayers, startLocalGame, sendChat,
     tryReconnect, handleGameOver, getStats, getSavedUsername,
@@ -866,5 +1017,14 @@ const ClientGame = (() => {
     respondJustSayNo: respondJustSayNoAny,
     respondAccept: respondAcceptAny,
     makePayment: makePaymentAny,
+    // No Mercy actions
+    playShack: playShackAny,
+    playNmPassGo: playNmPassGoAny,
+    playNmRent: playNmRentAny,
+    playSuperSlyDeal: playSuperSlyDealAny,
+    playRepossession: playRepossessionAny,
+    playToughLuck: playToughLuckAny,
+    playYoink: playYoinkAny,
+    playUnfairTrade: playUnfairTradeAny,
   };
 })();

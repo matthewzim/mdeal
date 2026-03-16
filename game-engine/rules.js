@@ -84,7 +84,12 @@ const Rules = {
     return player.properties.filter(c => c.actionType === ACTION_TYPE.HOTEL && c.attachedColor === color).length;
   },
 
-  // Rent for a given color (includes house/hotel bonuses)
+  // Count shacks on a given color set
+  countShacksOnColor(player, color) {
+    return player.properties.filter(c => c.actionType === ACTION_TYPE.SHACK && c.attachedColor === color).length;
+  },
+
+  // Rent for a given color (includes house/hotel/shack bonuses)
   rentAmount(player, color) {
     const count = this.countColor(player, color);
     const table = RENT_VALUES[color];
@@ -93,12 +98,14 @@ const Rules = {
     // Add house bonus (3M each) and hotel bonus (4M each)
     rent += this.countHousesOnColor(player, color) * 3;
     rent += this.countHotelsOnColor(player, color) * 4;
+    // Add shack bonus (5M each)
+    rent += this.countShacksOnColor(player, color) * 5;
     return rent;
   },
 
   // Is a property part of a completed set?
   isInCompletedSet(player, card) {
-    if (card.actionType === ACTION_TYPE.HOUSE || card.actionType === ACTION_TYPE.HOTEL) {
+    if (card.actionType === ACTION_TYPE.HOUSE || card.actionType === ACTION_TYPE.HOTEL || card.actionType === ACTION_TYPE.SHACK) {
       return card.attachedColor ? this.isSetComplete(player, card.attachedColor) : false;
     }
     const color = card.type === CARD_TYPE.WILD_PROPERTY ? card.currentColor : card.color;
@@ -345,6 +352,127 @@ const Rules = {
     if (!this.isSetComplete(player, targetColor)) {
       return { valid: false, reason: 'Can only add to a complete property set' };
     }
+    return { valid: true };
+  },
+
+  // ── No Mercy validations ───────────────────────────────────────────
+
+  validatePlayShack(state, playerId, cardId, targetColor) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.SHACK) return { valid: false, reason: 'Not a Shack card' };
+    if (!targetColor) return { valid: false, reason: 'Must specify a target color' };
+    if (this.countColor(player, targetColor) === 0) return { valid: false, reason: 'No properties of that color' };
+    return { valid: true };
+  },
+
+  validateNmPassGo(state, playerId, cardId) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.NM_PASS_GO) return { valid: false, reason: 'Not a Pass Go card' };
+    return { valid: true };
+  },
+
+  validateNmRent(state, playerId, cardId, targetColor, doubleCardId, targetPlayerId) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.NM_RENT) return { valid: false, reason: 'Not a Rent card' };
+    if (!Object.values(COLORS).includes(targetColor)) return { valid: false, reason: 'Invalid color' };
+    if (this.countColor(player, targetColor) === 0) return { valid: false, reason: 'No properties of that color' };
+    let playsNeeded = 1;
+    if (doubleCardId) {
+      const doubleCard = this.getCardFromHand(player, doubleCardId);
+      if (!doubleCard || doubleCard.actionType !== ACTION_TYPE.DOUBLE_RENT) {
+        return { valid: false, reason: 'Invalid Double The Rent card' };
+      }
+      playsNeeded = 2;
+    }
+    if (state.turnPlaysRemaining < playsNeeded) return { valid: false, reason: 'Not enough plays' };
+    return { valid: true };
+  },
+
+  validateSuperSlyDeal(state, playerId, cardId, targetColor) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.SUPER_SLY_DEAL) return { valid: false, reason: 'Not a Super Sly Deal' };
+    if (!Object.values(COLORS).includes(targetColor)) return { valid: false, reason: 'Invalid color' };
+    // At least one opponent must have a property of that color
+    const hasTarget = state.players.some(p => p.id !== playerId && this.countColor(p, targetColor) > 0);
+    if (!hasTarget) return { valid: false, reason: 'No opponents have properties of that color' };
+    return { valid: true };
+  },
+
+  validateRepossession(state, playerId, cardId, targetId) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.REPOSSESSION) return { valid: false, reason: 'Not a Repossession card' };
+    if (targetId === playerId) return { valid: false, reason: 'Cannot target yourself' };
+    const target = this.getPlayer(state, targetId);
+    if (!target) return { valid: false, reason: 'Target not found' };
+    if (target.properties.filter(c => c.type === 'property' || c.type === 'wild_property').length <= 1) {
+      return { valid: false, reason: 'Target has 1 or fewer properties' };
+    }
+    return { valid: true };
+  },
+
+  validateToughLuck(state, playerId, cardId, targetId, cardType) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.TOUGH_LUCK) return { valid: false, reason: 'Not a Tough Luck card' };
+    if (targetId === playerId) return { valid: false, reason: 'Cannot target yourself' };
+    if (!this.getPlayer(state, targetId)) return { valid: false, reason: 'Target not found' };
+    if (!['property', 'money', 'action'].includes(cardType)) return { valid: false, reason: 'Invalid card type choice' };
+    return { valid: true };
+  },
+
+  validateYoink(state, playerId, cardId, targetId) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.YOINK) return { valid: false, reason: 'Not a Yoink card' };
+    if (targetId === playerId) return { valid: false, reason: 'Cannot target yourself' };
+    if (!this.getPlayer(state, targetId)) return { valid: false, reason: 'Target not found' };
+    return { valid: true };
+  },
+
+  validateUnfairTrade(state, playerId, cardId, targetId) {
+    const player = this.getPlayer(state, playerId);
+    if (!player) return { valid: false, reason: 'Player not found' };
+    if (!this.isCurrentPlayer(state, playerId)) return { valid: false, reason: 'Not your turn' };
+    if (!this.canPlayCards(state)) return { valid: false, reason: 'No plays remaining' };
+    const card = this.getCardFromHand(player, cardId);
+    if (!card) return { valid: false, reason: 'Card not in hand' };
+    if (card.actionType !== ACTION_TYPE.UNFAIR_TRADE) return { valid: false, reason: 'Not an Unfair Trade card' };
+    if (targetId === playerId) return { valid: false, reason: 'Cannot target yourself' };
+    if (!this.getPlayer(state, targetId)) return { valid: false, reason: 'Target not found' };
+    if (this.bankTotal(player) === 0) return { valid: false, reason: 'Cannot play Unfair Trade with an empty bank' };
     return { valid: true };
   },
 

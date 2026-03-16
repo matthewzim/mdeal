@@ -23,7 +23,7 @@ const ComputerPlayer = (() => {
   const ALL_COLORS = Object.keys(SET_REQS);
 
   // Cards we should never bank or discard lightly
-  const POWERFUL_ACTIONS = ['deal_breaker', 'just_say_no', 'sly_deal'];
+  const POWERFUL_ACTIONS = ['deal_breaker', 'just_say_no', 'sly_deal', 'super_sly_deal', 'repossession'];
 
   function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -77,7 +77,7 @@ const ComputerPlayer = (() => {
 
   // Check if a property card is part of a completed set
   function isInCompletedSet(player, card) {
-    if (card.actionType === 'house' || card.actionType === 'hotel') {
+    if (card.actionType === 'house' || card.actionType === 'hotel' || card.actionType === 'shack') {
       return card.attachedColor ? isSetComplete(player, card.attachedColor) : false;
     }
     const color = card.type === 'wild_property' ? card.currentColor : card.color;
@@ -322,11 +322,15 @@ const ComputerPlayer = (() => {
       // Charge high rent
       const rentPlay = findBestRentPlay(player, state, computerId);
       if (rentPlay && rentPlay.amount >= 3) {
-        const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
-        if (rentPlay.doubleCardId) {
-          callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
+        if (rentPlay.isNmRent) {
+          callbacks.playNmRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId || null);
         } else {
-          callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
+          const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
+          if (rentPlay.doubleCardId) {
+            callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
+          } else {
+            callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
+          }
         }
         return;
       }
@@ -339,6 +343,11 @@ const ComputerPlayer = (() => {
       const passGo = player.hand.find(c => c.actionType === 'pass_go');
       if (passGo) {
         callbacks.playPassGo(passGo.id);
+        return;
+      }
+      const nmPassGoD = player.hand.find(c => c.actionType === 'nm_pass_go');
+      if (nmPassGoD) {
+        callbacks.playNmPassGo(nmPassGoD.id);
         return;
       }
 
@@ -359,7 +368,22 @@ const ComputerPlayer = (() => {
       return;
     }
 
-    // Priority 3b: Play house/hotel cards onto complete sets
+    // Priority 3b: Play shack/house/hotel cards onto complete sets
+    const shackCard = player.hand.find(c => c.actionType === 'shack');
+    if (shackCard) {
+      const eligibleSetsForShack = getCompletedSets(player);
+      if (eligibleSetsForShack.length > 0) {
+        let bestColor = eligibleSetsForShack[0];
+        let bestRent = rentAmount(player, eligibleSetsForShack[0]);
+        for (const color of eligibleSetsForShack.slice(1)) {
+          const r = rentAmount(player, color);
+          if (r > bestRent) { bestRent = r; bestColor = color; }
+        }
+        callbacks.playShack(shackCard.id, bestColor);
+        return;
+      }
+    }
+
     const houseHotelCard = player.hand.find(c => c.actionType === 'house' || c.actionType === 'hotel');
     if (houseHotelCard) {
       const eligibleSets = getCompletedSets(player).filter(c => c !== 'railroad' && c !== 'utility');
@@ -407,11 +431,15 @@ const ComputerPlayer = (() => {
     // Priority 7: Play rent (especially if high payout or double rent available)
     const rentPlay = findBestRentPlay(player, state, computerId);
     if (rentPlay) {
-      const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
-      if (rentPlay.doubleCardId) {
-        callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
+      if (rentPlay.isNmRent) {
+        callbacks.playNmRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId || null);
       } else {
-        callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
+        const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
+        if (rentPlay.doubleCardId) {
+          callbacks.playRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId, rentTarget);
+        } else {
+          callbacks.playRent(rentPlay.cardId, rentPlay.color, undefined, rentTarget);
+        }
       }
       return;
     }
@@ -437,6 +465,105 @@ const ComputerPlayer = (() => {
     const birthday = player.hand.find(c => c.actionType === 'birthday');
     if (birthday) {
       callbacks.playBirthday(birthday.id);
+      return;
+    }
+
+    // ── No Mercy-specific action cards ──
+
+    // Super Sly Deal: steal all of a color from all opponents
+    const superSlyDeal = player.hand.find(c => c.actionType === 'super_sly_deal');
+    if (superSlyDeal) {
+      // Pick the color with the most opponent properties
+      let bestColor = null;
+      let bestCount = 0;
+      for (const color of ALL_COLORS) {
+        let count = 0;
+        for (const opp of state.players) {
+          if (opp.id === computerId) continue;
+          count += countPlayerColor(opp, color);
+        }
+        if (count > bestCount) { bestCount = count; bestColor = color; }
+      }
+      if (bestColor && bestCount > 0) {
+        callbacks.playSuperSlyDeal(superSlyDeal.id, bestColor);
+        return;
+      }
+    }
+
+    // Repossession: target player with the most properties
+    const repossession = player.hand.find(c => c.actionType === 'repossession');
+    if (repossession) {
+      let bestTarget = null;
+      let maxProps = 1; // must have >1 property to be worth it
+      for (const opp of state.players) {
+        if (opp.id === computerId) continue;
+        if (opp.properties.length > maxProps) {
+          maxProps = opp.properties.length;
+          bestTarget = opp;
+        }
+      }
+      if (bestTarget) {
+        callbacks.playRepossession(repossession.id, bestTarget.id);
+        return;
+      }
+    }
+
+    // Yoink: steal 10M from richest opponent's bank
+    const yoink = player.hand.find(c => c.actionType === 'yoink');
+    if (yoink) {
+      let bestTarget = null;
+      let maxBank = 0;
+      for (const opp of state.players) {
+        if (opp.id === computerId) continue;
+        const bk = bankTotal(opp);
+        if (bk > maxBank) { maxBank = bk; bestTarget = opp; }
+      }
+      if (bestTarget && maxBank >= 5) {
+        callbacks.playYoink(yoink.id, bestTarget.id);
+        return;
+      }
+    }
+
+    // Tough Luck: steal all of one card type from a player's hand
+    const toughLuck = player.hand.find(c => c.actionType === 'tough_luck');
+    if (toughLuck) {
+      // Target the player with the largest hand, steal properties or actions
+      let bestTarget = null;
+      let maxHand = 0;
+      for (const opp of state.players) {
+        if (opp.id === computerId) continue;
+        const handSize = opp.hand?.length || opp.handSize || 0;
+        if (handSize > maxHand) { maxHand = handSize; bestTarget = opp; }
+      }
+      if (bestTarget && maxHand > 2) {
+        callbacks.playToughLuck(toughLuck.id, bestTarget.id, 'property');
+        return;
+      }
+    }
+
+    // Unfair Trade: swap banks if opponent has more
+    const unfairTrade = player.hand.find(c => c.actionType === 'unfair_trade');
+    if (unfairTrade) {
+      const myBank = bankTotal(player);
+      if (myBank > 0) {
+        let bestTarget = null;
+        let maxBank = myBank;
+        for (const opp of state.players) {
+          if (opp.id === computerId) continue;
+          const bk = bankTotal(opp);
+          if (bk > maxBank) { maxBank = bk; bestTarget = opp; }
+        }
+        if (bestTarget) {
+          callbacks.playUnfairTrade(unfairTrade.id, bestTarget.id);
+          return;
+        }
+      }
+    }
+
+    // No Mercy Pass Go: draw until 7 in hand
+    const nmPassGo = player.hand.find(c => c.actionType === 'nm_pass_go');
+    if (nmPassGo) {
+      callbacks.playNmPassGo(nmPassGo.id);
       return;
     }
 
@@ -598,7 +725,7 @@ const ComputerPlayer = (() => {
 
   function findBestRentPlay(player, state, computerId) {
     const rentCards = player.hand.filter(c =>
-      c.actionType === 'rent' || c.actionType === 'multi_rent'
+      c.actionType === 'rent' || c.actionType === 'multi_rent' || c.actionType === 'nm_rent'
     );
     if (rentCards.length === 0) return null;
 
@@ -608,7 +735,8 @@ const ComputerPlayer = (() => {
     let bestAmount = 0;
 
     for (const card of rentCards) {
-      const colors = card.actionType === 'multi_rent'
+      // nm_rent is universal (any color, charges all opponents)
+      const colors = (card.actionType === 'multi_rent' || card.actionType === 'nm_rent')
         ? ALL_COLORS
         : (card.rentColors || []);
 
@@ -625,6 +753,7 @@ const ComputerPlayer = (() => {
             amount: effectiveAmount,
             doubleCardId: doubleRent ? doubleRent.id : null,
             isMultiRent: card.actionType === 'multi_rent',
+            isNmRent: card.actionType === 'nm_rent',
           };
         }
       }
@@ -807,11 +936,23 @@ const ComputerPlayer = (() => {
     }
 
     // Block high rent (>= 5M) if we'd lose significant assets
-    if (pending.type === 'rent' || pending.type === 'debt_collector') {
-      const target = pending.targets.find(t => t.playerId === computerId);
+    if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'nm_rent') {
+      const target = pending.targets?.find(t => t.playerId === computerId);
       if (target && target.amount >= 5) {
         return true;
       }
+    }
+
+    // Always block Super Sly Deal, Repossession, Tough Luck, and Unfair Trade
+    if (pending.type === 'super_sly_deal') return true;
+    if (pending.type === 'repossession') return true;
+    if (pending.type === 'tough_luck') return true;
+    if (pending.type === 'unfair_trade') return true;
+
+    // Block Yoink if we have significant bank
+    if (pending.type === 'yoink') {
+      const player = state.players.find(p => p.id === computerId);
+      if (bankTotal(player) >= 5) return true;
     }
 
     return false;
@@ -913,10 +1054,19 @@ const ComputerPlayer = (() => {
     if (card.actionType === 'forced_deal') return 70;
     if (card.actionType === 'double_rent') return 65;
     if (card.actionType === 'house' || card.actionType === 'hotel') {
-      // Valuable if we have eligible complete sets
       const eligible = getCompletedSets(player).filter(c => c !== 'railroad' && c !== 'utility');
       return eligible.length > 0 ? 75 : 15;
     }
+    if (card.actionType === 'shack') {
+      return getCompletedSets(player).length > 0 ? 75 : 15;
+    }
+    if (card.actionType === 'super_sly_deal') return 85;
+    if (card.actionType === 'repossession') return 80;
+    if (card.actionType === 'yoink') return 40;
+    if (card.actionType === 'tough_luck') return 45;
+    if (card.actionType === 'unfair_trade') return 35;
+    if (card.actionType === 'nm_pass_go') return 35;
+    if (card.actionType === 'nm_rent') return 30;
 
     // Properties that advance sets are valuable
     if (card.type === 'property') {
@@ -931,7 +1081,7 @@ const ComputerPlayer = (() => {
     }
 
     // Duplicate rent cards - check if we have another of same colors
-    if (card.actionType === 'rent' || card.actionType === 'multi_rent') {
+    if (card.actionType === 'rent' || card.actionType === 'multi_rent' || card.actionType === 'nm_rent') {
       const dupes = player.hand.filter(c =>
         c.id !== card.id &&
         (c.actionType === 'rent' || c.actionType === 'multi_rent') &&

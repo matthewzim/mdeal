@@ -7,7 +7,7 @@
 
 const {
   COLORS, SET_REQUIREMENTS, RENT_VALUES, CARD_TYPE, ACTION_TYPE,
-  buildFullDeck, shuffleDeck,
+  buildFullDeck, buildDeck, shuffleDeck,
 } = typeof require !== 'undefined'
   ? require('./deck.js')
   : window.MonopolyDeck;
@@ -20,8 +20,8 @@ const GameEngine = {
 
   // ── Initialization ───────────────────────────────────────────────────
 
-  createInitialState(playerIds) {
-    const deck = shuffleDeck(buildFullDeck());
+  createInitialState(playerIds, gameMode) {
+    const deck = shuffleDeck(buildDeck(gameMode || 'regular'));
 
     const players = playerIds.map(id => ({
       id,
@@ -36,11 +36,12 @@ const GameEngine = {
       players,
       currentPlayer: playerIds[0],
       turnPlaysRemaining: 3,
-      phase: 'play',        // 'draw' | 'play' | 'discard' | 'pay' | 'respond' | 'finished'
+      phase: 'play',        // 'draw' | 'play' | 'discard' | 'pay' | 'respond' | 'finished' | 'redistribute'
       pendingAction: null,   // for actions that require opponent response
       winner: null,
       log: [],
       turnDrawn: false,
+      gameMode: gameMode || 'regular',
     };
 
     // Deal 5 cards to each player
@@ -379,6 +380,169 @@ const GameEngine = {
     return {};
   },
 
+  // ── No Mercy actions ─────────────────────────────────────────────────
+
+  playShack(state, playerId, cardId, targetColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    card.attachedColor = targetColor;
+    player.properties.push(card);
+    state.turnPlaysRemaining--;
+    state.log.push({ type: 'play_shack', player: playerId, card: card.name, color: targetColor });
+    return { card };
+  },
+
+  playNmPassGo(state, playerId, cardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+    const drawCount = Math.max(0, 7 - player.hand.length);
+    const drawn = this.drawCards(state, playerId, drawCount);
+    state.log.push({ type: 'nm_pass_go', player: playerId, drawn: drawn.length });
+    return { drawn };
+  },
+
+  playNmRent(state, playerId, cardId, targetColor, doubleCardId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    let rentAmount = Rules.rentAmount(player, targetColor);
+    let doubled = false;
+
+    if (doubleCardId) {
+      const doubleCard = this.removeFromHand(player, doubleCardId);
+      state.discardPile.push(doubleCard);
+      state.turnPlaysRemaining--;
+      rentAmount *= 2;
+      doubled = true;
+    }
+
+    const targets = state.players.filter(p => p.id !== playerId).map(p => p.id);
+    state.pendingAction = {
+      type: 'rent',
+      from: playerId,
+      targets: targets.map(t => ({ playerId: t, amount: rentAmount, paid: false, cancelled: false })),
+      color: targetColor,
+      amount: rentAmount,
+      doubled,
+      respondQueue: [...targets],
+      currentResponder: targets[0] || null,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rentAmount, doubled });
+    return { rentAmount, targets };
+  },
+
+  playSuperSlyDeal(state, playerId, cardId, targetColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    // Find all opponents who have properties of this color
+    const affectedPlayers = state.players.filter(p => p.id !== playerId && Rules.countColor(p, targetColor) > 0).map(p => p.id);
+
+    state.pendingAction = {
+      type: 'super_sly_deal',
+      from: playerId,
+      targetColor,
+      affectedPlayers: [...affectedPlayers],
+      respondQueue: [...affectedPlayers],
+      currentResponder: affectedPlayers[0] || null,
+      cancelledPlayers: [],
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'super_sly_deal', player: playerId, color: targetColor });
+    return {};
+  },
+
+  playRepossession(state, playerId, cardId, targetId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    state.pendingAction = {
+      type: 'repossession',
+      from: playerId,
+      targetId,
+      respondQueue: [targetId],
+      currentResponder: targetId,
+      cancelled: false,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'repossession', player: playerId, target: targetId });
+    return {};
+  },
+
+  playToughLuck(state, playerId, cardId, targetId, cardType) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    state.pendingAction = {
+      type: 'tough_luck',
+      from: playerId,
+      targetId,
+      cardType, // 'property' | 'money' | 'action'
+      respondQueue: [targetId],
+      currentResponder: targetId,
+      cancelled: false,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'tough_luck', player: playerId, target: targetId, cardType });
+    return {};
+  },
+
+  playYoink(state, playerId, cardId, targetId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    state.pendingAction = {
+      type: 'yoink',
+      from: playerId,
+      targets: [{ playerId: targetId, amount: 10, paid: false, cancelled: false }],
+      respondQueue: [targetId],
+      currentResponder: targetId,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'yoink', player: playerId, target: targetId });
+    return {};
+  },
+
+  playUnfairTrade(state, playerId, cardId, targetId) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    state.pendingAction = {
+      type: 'unfair_trade',
+      from: playerId,
+      targetId,
+      respondQueue: [targetId],
+      currentResponder: targetId,
+      cancelled: false,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'unfair_trade', player: playerId, target: targetId });
+    return {};
+  },
+
   // ── Response handling (Just Say No chains) ───────────────────────────
 
   respondJustSayNo(state, playerId, cardId) {
@@ -389,7 +553,7 @@ const GameEngine = {
     const pending = state.pendingAction;
 
     // Toggle cancel state - Just Say No chains
-    if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday') {
+    if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday' || pending.type === 'yoink') {
       const target = pending.targets.find(t => t.playerId === playerId);
       if (target) target.cancelled = !target.cancelled;
     } else {
@@ -400,14 +564,28 @@ const GameEngine = {
     // Set the responder to the other party
     if (pending.from === playerId) {
       // The action initiator countered, so the target can respond again
-      pending.currentResponder = pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday'
-        ? pending.respondQueue.find(t => {
+      if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday' || pending.type === 'yoink') {
+        pending.currentResponder = pending.respondQueue.find(t => {
             const tgt = pending.targets.find(tt => tt.playerId === t);
             return tgt && tgt.cancelled;
-          }) || null
-        : pending.targetId;
+          }) || null;
+      } else if (pending.type === 'super_sly_deal') {
+        // Find which affected player was cancelled
+        pending.currentResponder = pending.respondQueue.find(t => pending.cancelledPlayers.includes(t)) || null;
+      } else {
+        pending.currentResponder = pending.targetId;
+      }
     } else {
       // Target said no, action initiator can counter
+      if (pending.type === 'super_sly_deal') {
+        // Track cancelled players for super sly deal
+        if (!pending.cancelledPlayers.includes(playerId)) {
+          pending.cancelledPlayers.push(playerId);
+        } else {
+          // Un-cancel (JSN chain)
+          pending.cancelledPlayers = pending.cancelledPlayers.filter(id => id !== playerId);
+        }
+      }
       pending.currentResponder = pending.from;
     }
 
@@ -418,19 +596,17 @@ const GameEngine = {
   respondAccept(state, playerId) {
     const pending = state.pendingAction;
 
-    if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday') {
+    if (pending.type === 'rent' || pending.type === 'debt_collector' || pending.type === 'birthday' || pending.type === 'yoink') {
       // Move to next responder or start payment phase
       const idx = pending.respondQueue.indexOf(playerId);
       if (idx !== -1) pending.respondQueue.splice(idx, 1);
 
       if (pending.currentResponder === playerId) {
-        // Find next responder
         pending.currentResponder = pending.respondQueue[0] || null;
       }
 
       if (pending.respondQueue.length === 0 || pending.currentResponder === null) {
         // All responded, now collect payments
-        // Skip players with no assets — nothing to give
         for (const t of pending.targets) {
           if (!t.cancelled && !t.paid) {
             const p = Rules.getPlayer(state, t.playerId);
@@ -448,6 +624,35 @@ const GameEngine = {
           this._resolveAction(state);
         }
       }
+    } else if (pending.type === 'super_sly_deal') {
+      // Each affected player can accept or JSN individually
+      const idx = pending.respondQueue.indexOf(playerId);
+      if (idx !== -1) pending.respondQueue.splice(idx, 1);
+
+      if (pending.currentResponder === playerId) {
+        pending.currentResponder = pending.respondQueue[0] || null;
+      }
+
+      if (pending.respondQueue.length === 0 || pending.currentResponder === null) {
+        // Execute: steal all of targetColor from each non-cancelled player
+        this._executeSuperSlyDeal(state);
+        this._resolveAction(state);
+      }
+    } else if (pending.type === 'repossession') {
+      if (!pending.cancelled) {
+        this._executeRepossession(state);
+      }
+      this._resolveAction(state);
+    } else if (pending.type === 'tough_luck') {
+      if (!pending.cancelled) {
+        this._executeToughLuck(state);
+      }
+      this._resolveAction(state);
+    } else if (pending.type === 'unfair_trade') {
+      if (!pending.cancelled) {
+        this._executeUnfairTrade(state);
+      }
+      this._resolveAction(state);
     } else {
       // Sly Deal, Forced Deal, Deal Breaker - single target accepts
       if (!pending.cancelled) {
@@ -545,8 +750,8 @@ const GameEngine = {
       const setCards = target.properties.filter(c => {
         if (c.type === CARD_TYPE.PROPERTY) return c.color === color;
         if (c.type === CARD_TYPE.WILD_PROPERTY) return c.currentColor === color;
-        // Include houses/hotels attached to this color
-        if ((c.actionType === ACTION_TYPE.HOUSE || c.actionType === ACTION_TYPE.HOTEL) && c.attachedColor === color) return true;
+        // Include houses/hotels/shacks attached to this color
+        if ((c.actionType === ACTION_TYPE.HOUSE || c.actionType === ACTION_TYPE.HOTEL || c.actionType === ACTION_TYPE.SHACK) && c.attachedColor === color) return true;
         return false;
       });
       for (const card of setCards) {
@@ -557,6 +762,104 @@ const GameEngine = {
         }
       }
     }
+  },
+
+  _executeSuperSlyDeal(state) {
+    const pending = state.pendingAction;
+    const from = Rules.getPlayer(state, pending.from);
+    const color = pending.targetColor;
+
+    for (const pid of pending.affectedPlayers) {
+      if (pending.cancelledPlayers.includes(pid)) continue;
+      const target = Rules.getPlayer(state, pid);
+      const toSteal = target.properties.filter(c => {
+        if (c.type === CARD_TYPE.PROPERTY) return c.color === color;
+        if (c.type === CARD_TYPE.WILD_PROPERTY) return c.currentColor === color;
+        // Include shacks/houses/hotels attached to this color
+        if ((c.actionType === ACTION_TYPE.SHACK || c.actionType === ACTION_TYPE.HOUSE || c.actionType === ACTION_TYPE.HOTEL) && c.attachedColor === color) return true;
+        return false;
+      });
+      for (const card of toSteal) {
+        const idx = target.properties.indexOf(card);
+        if (idx !== -1) {
+          target.properties.splice(idx, 1);
+          from.properties.push(card);
+        }
+      }
+    }
+  },
+
+  _executeRepossession(state) {
+    const pending = state.pendingAction;
+    const from = Rules.getPlayer(state, pending.from);
+    const target = Rules.getPlayer(state, pending.targetId);
+
+    // Target must give all but one property to other players
+    // For simplicity: properties go to the initiator (who played the card)
+    // The target keeps their most valuable property
+    const propCards = target.properties.filter(c => c.type === CARD_TYPE.PROPERTY || c.type === CARD_TYPE.WILD_PROPERTY);
+    if (propCards.length <= 1) return;
+
+    // Sort by value descending - keep the highest
+    propCards.sort((a, b) => b.value - a.value);
+    const keepCard = propCards[0];
+
+    // Distribute the rest among other players (round-robin, excluding target)
+    const recipients = state.players.filter(p => p.id !== pending.targetId);
+    let recipientIdx = 0;
+
+    // Also move any attached upgrades (shacks, houses, hotels)
+    const allToGive = target.properties.filter(c => c !== keepCard && !(c.attachedColor && c.attachedColor === (keepCard.currentColor || keepCard.color)));
+
+    for (const card of allToGive) {
+      const idx = target.properties.indexOf(card);
+      if (idx !== -1) {
+        target.properties.splice(idx, 1);
+        recipients[recipientIdx % recipients.length].properties.push(card);
+        recipientIdx++;
+      }
+    }
+
+    state.log.push({ type: 'repossession_done', target: pending.targetId, cardsGiven: allToGive.length });
+  },
+
+  _executeToughLuck(state) {
+    const pending = state.pendingAction;
+    const from = Rules.getPlayer(state, pending.from);
+    const target = Rules.getPlayer(state, pending.targetId);
+    const cardType = pending.cardType;
+
+    const stolen = [];
+    const toSteal = target.hand.filter(c => {
+      if (cardType === 'property') return c.type === CARD_TYPE.PROPERTY || c.type === CARD_TYPE.WILD_PROPERTY;
+      if (cardType === 'money') return c.type === CARD_TYPE.MONEY;
+      if (cardType === 'action') return c.type === CARD_TYPE.ACTION;
+      return false;
+    });
+
+    for (const card of toSteal) {
+      const idx = target.hand.indexOf(card);
+      if (idx !== -1) {
+        target.hand.splice(idx, 1);
+        from.hand.push(card);
+        stolen.push(card);
+      }
+    }
+
+    state.log.push({ type: 'tough_luck_done', from: pending.from, target: pending.targetId, cardType, count: stolen.length });
+  },
+
+  _executeUnfairTrade(state) {
+    const pending = state.pendingAction;
+    const from = Rules.getPlayer(state, pending.from);
+    const target = Rules.getPlayer(state, pending.targetId);
+
+    // Swap banks
+    const tempBank = from.bank;
+    from.bank = target.bank;
+    target.bank = tempBank;
+
+    state.log.push({ type: 'unfair_trade_done', from: pending.from, target: pending.targetId });
   },
 
   _resolveAction(state) {
