@@ -86,11 +86,14 @@ html, body {
 /* ── Player Stats Dashboard ─────────────────────────────────────────── */
 
 .stats-dashboard {
+  position: absolute;
+  top: 16px;
+  right: 16px;
   background: rgba(0,0,0,0.3);
   border: 1px solid rgba(212, 168, 67, 0.3);
   border-radius: 12px;
   padding: 12px 16px;
-  margin-bottom: 20px;
+  z-index: 10;
 }
 
 .stats-row {
