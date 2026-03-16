@@ -322,7 +322,9 @@ const ComputerPlayer = (() => {
       // Charge high rent
       const rentPlay = findBestRentPlay(player, state, computerId);
       if (rentPlay && rentPlay.amount >= 3) {
-        if (rentPlay.isNmRent) {
+        if (rentPlay.isDoubleRentAlone) {
+          callbacks.playDoubleRentAlone(rentPlay.cardId, rentPlay.color);
+        } else if (rentPlay.isNmRent) {
           callbacks.playNmRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId || null);
         } else {
           const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
@@ -431,7 +433,9 @@ const ComputerPlayer = (() => {
     // Priority 7: Play rent (especially if high payout or double rent available)
     const rentPlay = findBestRentPlay(player, state, computerId);
     if (rentPlay) {
-      if (rentPlay.isNmRent) {
+      if (rentPlay.isDoubleRentAlone) {
+        callbacks.playDoubleRentAlone(rentPlay.cardId, rentPlay.color);
+      } else if (rentPlay.isNmRent) {
         callbacks.playNmRent(rentPlay.cardId, rentPlay.color, rentPlay.doubleCardId || null);
       } else {
         const rentTarget = rentPlay.isMultiRent ? chooseRichestOpponent(state, computerId)?.id : undefined;
@@ -727,8 +731,6 @@ const ComputerPlayer = (() => {
     const rentCards = player.hand.filter(c =>
       c.actionType === 'rent' || c.actionType === 'multi_rent' || c.actionType === 'nm_rent'
     );
-    if (rentCards.length === 0) return null;
-
     const doubleRent = player.hand.find(c => c.actionType === 'double_rent');
 
     let bestPlay = null;
@@ -754,6 +756,28 @@ const ComputerPlayer = (() => {
             doubleCardId: doubleRent ? doubleRent.id : null,
             isMultiRent: card.actionType === 'multi_rent',
             isNmRent: card.actionType === 'nm_rent',
+            isDoubleRentAlone: false,
+          };
+        }
+      }
+    }
+
+    // In no mercy mode, double rent can be played alone
+    if (rentCards.length === 0 && doubleRent && state.gameMode === 'nomercy') {
+      for (const color of ALL_COLORS) {
+        const amount = rentAmount(player, color);
+        if (amount === 0) continue;
+        const effectiveAmount = amount * 2;
+        if (effectiveAmount > bestAmount) {
+          bestAmount = effectiveAmount;
+          bestPlay = {
+            cardId: doubleRent.id,
+            color,
+            amount: effectiveAmount,
+            doubleCardId: null,
+            isMultiRent: false,
+            isNmRent: false,
+            isDoubleRentAlone: true,
           };
         }
       }

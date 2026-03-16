@@ -439,6 +439,32 @@ const GameEngine = {
     return { rentAmount, targets };
   },
 
+  playDoubleRentAlone(state, playerId, cardId, targetColor) {
+    if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
+    const player = Rules.getPlayer(state, playerId);
+    const card = this.removeFromHand(player, cardId);
+    state.discardPile.push(card);
+    state.turnPlaysRemaining--;
+
+    let rentAmount = Rules.rentAmount(player, targetColor);
+    rentAmount *= 2;
+
+    const targets = state.players.filter(p => p.id !== playerId).map(p => p.id);
+    state.pendingAction = {
+      type: 'rent',
+      from: playerId,
+      targets: targets.map(t => ({ playerId: t, amount: rentAmount, paid: false, cancelled: false })),
+      color: targetColor,
+      amount: rentAmount,
+      doubled: true,
+      respondQueue: [...targets],
+      currentResponder: targets[0] || null,
+    };
+    state.phase = 'respond';
+    state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rentAmount, doubled: true });
+    return { rentAmount, targets };
+  },
+
   playSuperSlyDeal(state, playerId, cardId, targetColor) {
     if (state.turnPlaysRemaining <= 0) return { error: 'No plays remaining' };
     const player = Rules.getPlayer(state, playerId);

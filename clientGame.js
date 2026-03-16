@@ -534,6 +534,7 @@ const ClientGame = (() => {
       playShack: (cardId, targetColor) => localPlayShack(cardId, targetColor),
       playNmPassGo: (cardId) => localPlayNmPassGo(cardId),
       playNmRent: (cardId, color, doubleCardId) => localPlayNmRent(cardId, color, doubleCardId),
+      playDoubleRentAlone: (cardId, targetColor) => localPlayDoubleRentAlone(cardId, targetColor),
       playSuperSlyDeal: (cardId, targetColor) => localPlaySuperSlyDeal(cardId, targetColor),
       playRepossession: (cardId, targetId) => localPlayRepossession(cardId, targetId),
       playToughLuck: (cardId, targetId, cardType) => localPlayToughLuck(cardId, targetId, cardType),
@@ -628,6 +629,12 @@ const ClientGame = (() => {
     _showCardBeforePlay(cardId);
     if (doubleCardId) _showCardBeforePlay(doubleCardId);
     GameEngine.playNmRent(gameState, gameState.currentPlayer, cardId, targetColor, doubleCardId || null);
+    renderLocalGame();
+  }
+
+  function localPlayDoubleRentAlone(cardId, targetColor) {
+    _showCardBeforePlay(cardId);
+    GameEngine.playDoubleRentAlone(gameState, gameState.currentPlayer, cardId, targetColor);
     renderLocalGame();
   }
 
@@ -829,6 +836,17 @@ const ClientGame = (() => {
     }
   }
 
+  async function playDoubleRentAloneAny(cardId, targetColor) {
+    if (isLocalGame) {
+      localPlayDoubleRentAlone(cardId, targetColor);
+    } else {
+      try {
+        const result = await SupabaseClient.playCard(gameId, 'double_rent_alone', { cardId, targetColor });
+        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
+      } catch (err) { UI.showError(err.message); }
+    }
+  }
+
   async function playSuperSlyDealAny(cardId, targetColor) {
     if (isLocalGame) {
       localPlaySuperSlyDeal(cardId, targetColor);
@@ -1021,6 +1039,7 @@ const ClientGame = (() => {
     playShack: playShackAny,
     playNmPassGo: playNmPassGoAny,
     playNmRent: playNmRentAny,
+    playDoubleRentAlone: playDoubleRentAloneAny,
     playSuperSlyDeal: playSuperSlyDealAny,
     playRepossession: playRepossessionAny,
     playToughLuck: playToughLuckAny,
