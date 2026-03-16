@@ -20,27 +20,27 @@
   <!-- LOGIN SCREEN                                                  -->
   <!-- ══════════════════════════════════════════════════════════════ -->
   <div id="login-screen" class="screen active">
+    <!-- Player Stats Dashboard (upper-right corner) -->
+    <div id="player-stats-dashboard" class="stats-dashboard">
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="stat-value" id="stat-games">0</div>
+          <div class="stat-label">Games</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-winrate">0%</div>
+          <div class="stat-label">Win Rate</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-elo">1200</div>
+          <div class="stat-label">Rating</div>
+        </div>
+      </div>
+    </div>
+
     <div class="login-box">
       <h1>MDEAL.IO</h1>
       <h2>Online Multiplayer Card Game</h2>
-
-      <!-- Player Stats Dashboard -->
-      <div id="player-stats-dashboard" class="stats-dashboard">
-        <div class="stats-row">
-          <div class="stat-item">
-            <div class="stat-value" id="stat-games">0</div>
-            <div class="stat-label">Games</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="stat-winrate">0%</div>
-            <div class="stat-label">Win Rate</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="stat-elo">1200</div>
-            <div class="stat-label">Rating</div>
-          </div>
-        </div>
-      </div>
 
       <div class="input-group">
         <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">

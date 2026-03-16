@@ -1767,12 +1767,6 @@ const UI = (() => {
       ? Math.round((stats.wins / stats.gamesPlayed) * 100) + '%'
       : '0%';
     if (eloEl) eloEl.textContent = stats.elo;
-
-    // Hide dashboard if no games played yet
-    const dashboard = document.getElementById('player-stats-dashboard');
-    if (dashboard) {
-      dashboard.style.display = stats.gamesPlayed > 0 ? 'block' : 'none';
-    }
   }
 
   // ── Init ─────────────────────────────────────────────────────────────
