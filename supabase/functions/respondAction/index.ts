@@ -153,6 +153,7 @@ serve(async (req) => {
         pending.currentResponder = pending.from;
       }
 
+      pending.lastJsnPlayer = playerId;
       state.log.push({ type: 'just_say_no', player: playerId });
 
       await saveState(supabase, gameId, state);

@@ -929,12 +929,23 @@ const UI = (() => {
     if (isResponder && state.phase === 'respond') {
       const myPlayer = state.players.find(p => p.id === myId);
       const hasJSN = myPlayer?.hand?.some(c => c.actionType === 'just_say_no');
-      const actionDesc = describeAction(pending, names);
+
+      // Check if this is a Just Say No response (someone played JSN)
+      const isJsnResponse = !!pending.lastJsnPlayer;
+      let title, description;
+      if (isJsnResponse) {
+        const jsnPlayerName = escapeHtml(names[pending.lastJsnPlayer] || 'Opponent');
+        title = `${jsnPlayerName} used Just Say No!`;
+        description = `Your action has been blocked.`;
+      } else {
+        title = 'Action Against You!';
+        description = describeAction(pending, names);
+      }
 
       let html = `
         <div class="action-modal">
-          <h3>Action Against You!</h3>
-          <p>${actionDesc}</p>
+          <h3>${title}</h3>
+          <p>${description}</p>
           <div class="action-buttons">
             <button class="btn btn-accept" onclick="UI._handleAccept()">Accept</button>
       `;
