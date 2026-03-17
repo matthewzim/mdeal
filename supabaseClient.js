@@ -354,6 +354,37 @@ const SupabaseClient = (() => {
     });
   }
 
+  // ── Global Chat (Realtime Broadcast) ──────────────────────────────
+
+  let globalChatChannel = null;
+
+  function subscribeToGlobalChat(onMessage) {
+    if (globalChatChannel) return globalChatChannel;
+    globalChatChannel = supabase
+      .channel('global_chat')
+      .on('broadcast', { event: 'global_message' }, (payload) => {
+        onMessage(payload.payload);
+      })
+      .subscribe();
+    return globalChatChannel;
+  }
+
+  function sendGlobalChatMessage(message) {
+    const channel = supabase.channel('global_chat');
+    channel.send({
+      type: 'broadcast',
+      event: 'global_message',
+      payload: message,
+    });
+  }
+
+  function unsubscribeGlobalChat() {
+    if (globalChatChannel) {
+      supabase.removeChannel(globalChatChannel);
+      globalChatChannel = null;
+    }
+  }
+
   return {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
     createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
@@ -361,5 +392,6 @@ const SupabaseClient = (() => {
     getPublicRooms, getOnlinePlayerCount,
     subscribeToRoom, subscribeToGame, unsubscribeAll,
     subscribeToChatChannel, sendChatMessage,
+    subscribeToGlobalChat, sendGlobalChatMessage, unsubscribeGlobalChat,
   };
 })();

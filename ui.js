@@ -2132,6 +2132,81 @@ const UI = (() => {
     ClientGame.sendChat(text);
   }
 
+  // ── Global Chat ─────────────────────────────────────────────────────
+
+  let globalChatMessages = [];
+
+  function initGlobalChat() {
+    SupabaseClient.subscribeToGlobalChat((msg) => {
+      globalChatMessages.push(msg);
+      if (globalChatMessages.length > 100) globalChatMessages.shift();
+      renderGlobalChatMessages();
+    });
+
+    // Sync the global chat name input with the username input
+    const usernameInput = document.getElementById('input-username');
+    const chatNameInput = document.getElementById('global-chat-name');
+    if (usernameInput && chatNameInput) {
+      const savedName = usernameInput.value;
+      if (savedName) chatNameInput.value = savedName;
+
+      usernameInput.addEventListener('input', () => {
+        chatNameInput.value = usernameInput.value;
+      });
+      chatNameInput.addEventListener('input', () => {
+        usernameInput.value = chatNameInput.value;
+      });
+    }
+  }
+
+  function renderGlobalChatMessages() {
+    const el = document.getElementById('global-chat-messages');
+    if (!el) return;
+
+    el.innerHTML = globalChatMessages.map(msg => {
+      const time = new Date(msg.time);
+      const timeStr = time.getHours().toString().padStart(2, '0') + ':' +
+                      time.getMinutes().toString().padStart(2, '0');
+      return `<div class="chat-message">` +
+        `<span class="chat-author">${escapeHtml(msg.author)}:</span>` +
+        `${escapeHtml(msg.text)}` +
+        `<span class="chat-time">${timeStr}</span>` +
+        `</div>`;
+    }).join('');
+
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function sendGlobalChat() {
+    const nameInput = document.getElementById('global-chat-name');
+    const msgInput = document.getElementById('global-chat-input');
+    if (!nameInput || !msgInput) return;
+
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      nameInput.style.borderColor = 'var(--accent-red)';
+      setTimeout(() => { nameInput.style.borderColor = ''; }, 1500);
+      return;
+    }
+
+    const text = msgInput.value.trim();
+    if (!text) return;
+
+    const msg = {
+      author: name,
+      text: text,
+      time: Date.now(),
+    };
+
+    globalChatMessages.push(msg);
+    if (globalChatMessages.length > 100) globalChatMessages.shift();
+    renderGlobalChatMessages();
+
+    SupabaseClient.sendGlobalChatMessage(msg);
+    msgInput.value = '';
+  }
+
   // ── Stats Dashboard ──────────────────────────────────────────────────
 
   function updateStatsDashboard() {
@@ -2161,6 +2236,10 @@ const UI = (() => {
         e.preventDefault();
         sendChat();
       }
+      if (e.key === 'Enter' && e.target.id === 'global-chat-input') {
+        e.preventDefault();
+        sendGlobalChat();
+      }
     });
   }
 
@@ -2169,6 +2248,7 @@ const UI = (() => {
     updateLobby, refreshPublicGames, renderGame, showError, showToast, showLoading,
     showDrawnCards, showDiscardPrompt, showWinner, showPlayedCard,
     renderChatMessages, sendChat, updateStatsDashboard,
+    initGlobalChat, sendGlobalChat,
     // Exposed for onclick handlers in HTML
     _closeOverlay, _doBank, _doPlayProperty, _doPlayHouseHotel, _doPassGo, _doRent,
     _showMultiRentTargetPicker, _doMultiRent,
