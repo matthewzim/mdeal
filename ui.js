@@ -1237,16 +1237,16 @@ const UI = (() => {
         // ── No Mercy action cards ──
 
         case 'shack': {
-          // Shack can be placed on any set (including railroad/utility)
-          const completedForShack = getCompletedSetColors(player);
-          if (completedForShack.length > 0) {
+          // Shack can be placed on any set with properties (including incomplete, railroad/utility)
+          const colorsForShack = Object.keys(COLOR_MAP).filter(c => countPlayerColor(player, c) > 0);
+          if (colorsForShack.length > 0) {
             html += `<div class="color-picker"><p>Add Shack to set (+5M rent):</p>`;
-            for (const color of completedForShack) {
+            for (const color of colorsForShack) {
               html += `<button class="btn btn-color" style="background:${COLOR_MAP[color]}" onclick="UI._doShack('${card.id}', '${color}')">${COLOR_LABELS[color]}</button>`;
             }
             html += `</div>`;
           } else {
-            html += `<p class="card-detail">No complete sets to place a Shack on</p>`;
+            html += `<p class="card-detail">No properties to place a Shack on</p>`;
           }
           break;
         }

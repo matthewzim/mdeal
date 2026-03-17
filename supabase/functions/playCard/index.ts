@@ -489,7 +489,7 @@ serve(async (req) => {
       const card = player.hand.find((c: any) => c.id === cardId);
       if (!card || card.actionType !== 'shack') return fail("Not a Shack card");
       if (!targetColor) return fail("Must specify a target color");
-      if (!isSetComplete(player, targetColor)) return fail("Can only add Shack to a complete set");
+      if (countColor(player, targetColor) === 0) return fail("No properties of that color");
 
       const removed = removeFromHand(player, cardId);
       removed.attachedColor = targetColor;

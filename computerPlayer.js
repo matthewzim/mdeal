@@ -370,14 +370,17 @@ const ComputerPlayer = (() => {
       return;
     }
 
-    // Priority 3b: Play shack/house/hotel cards onto complete sets
+    // Priority 3b: Play shack on any set with properties (incomplete sets allowed)
     const shackCard = player.hand.find(c => c.actionType === 'shack');
     if (shackCard) {
-      const eligibleSetsForShack = getCompletedSets(player);
-      if (eligibleSetsForShack.length > 0) {
-        let bestColor = eligibleSetsForShack[0];
-        let bestRent = rentAmount(player, eligibleSetsForShack[0]);
-        for (const color of eligibleSetsForShack.slice(1)) {
+      const colorsWithProps = ALL_COLORS.filter(c => countPlayerColor(player, c) > 0);
+      if (colorsWithProps.length > 0) {
+        // Prefer completed sets first, then pick highest rent
+        const completed = colorsWithProps.filter(c => isSetComplete(player, c));
+        const candidates = completed.length > 0 ? completed : colorsWithProps;
+        let bestColor = candidates[0];
+        let bestRent = rentAmount(player, candidates[0]);
+        for (const color of candidates.slice(1)) {
           const r = rentAmount(player, color);
           if (r > bestRent) { bestRent = r; bestColor = color; }
         }
@@ -1082,7 +1085,9 @@ const ComputerPlayer = (() => {
       return eligible.length > 0 ? 75 : 15;
     }
     if (card.actionType === 'shack') {
-      return getCompletedSets(player).length > 0 ? 75 : 15;
+      // Shack can be placed on any set (including incomplete)
+      const hasProps = ALL_COLORS.some(c => countPlayerColor(player, c) > 0);
+      return hasProps ? 75 : 15;
     }
     if (card.actionType === 'super_sly_deal') return 85;
     if (card.actionType === 'repossession') return 80;
