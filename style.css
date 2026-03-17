@@ -58,6 +58,14 @@ html, body {
   background: radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt-dark) 100%);
 }
 
+.login-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  justify-content: center;
+  max-width: 90vw;
+}
+
 .login-box {
   background: rgba(0,0,0,0.4);
   border: 2px solid var(--gold);
@@ -66,6 +74,130 @@ html, body {
   width: 400px;
   max-width: 90vw;
   text-align: center;
+}
+
+/* ── Global Chat Panel ─────────────────────────────────────────────── */
+
+#global-chat-panel {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 500px;
+  background: rgba(0,0,0,0.4);
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.global-chat-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+#global-chat-messages {
+  flex: 1 1 0;
+  overflow-y: auto;
+  min-height: 0;
+  margin-bottom: 8px;
+}
+
+#global-chat-messages .chat-message {
+  font-size: 0.8rem;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--text-light);
+}
+
+#global-chat-messages .chat-author {
+  font-weight: 600;
+  margin-right: 4px;
+  color: var(--gold);
+}
+
+#global-chat-messages .chat-time {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  margin-left: 4px;
+}
+
+#global-chat-name-row {
+  margin-bottom: 6px;
+}
+
+#global-chat-name {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: white;
+  font-size: 0.8rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+#global-chat-name::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+#global-chat-name:focus {
+  border-color: var(--gold);
+}
+
+#global-chat-input-row {
+  display: flex;
+  gap: 4px;
+}
+
+#global-chat-input {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: white;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+#global-chat-input::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+#global-chat-input:focus {
+  border-color: var(--gold);
+}
+
+#global-chat-send-btn {
+  background: var(--gold-dark);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#global-chat-send-btn:hover {
+  background: var(--gold);
+}
+
+@media (max-width: 800px) {
+  .login-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+  #global-chat-panel {
+    width: 400px;
+    max-width: 90vw;
+    height: 300px;
+  }
 }
 
 .login-box h1 {

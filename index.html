@@ -38,46 +38,61 @@
       </div>
     </div>
 
-    <div class="login-box">
-      <h1>MDEAL.IO</h1>
-      <h2>Online Multiplayer Card Game</h2>
+    <div class="login-layout">
+      <div class="login-box">
+        <h1>MDEAL.IO</h1>
+        <h2>Online Multiplayer Card Game</h2>
 
-      <div class="game-mode-toggle">
-        <button class="game-mode-btn active" id="btn-mode-regular" data-mode="regular">Regular</button>
-        <button class="game-mode-btn" id="btn-mode-nomercy" data-mode="nomercy">No Mercy</button>
+        <div class="game-mode-toggle">
+          <button class="game-mode-btn active" id="btn-mode-regular" data-mode="regular">Regular</button>
+          <button class="game-mode-btn" id="btn-mode-nomercy" data-mode="nomercy">No Mercy</button>
+        </div>
+
+        <div class="input-group">
+          <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">
+        </div>
+
+        <div class="create-room-row">
+          <button class="btn btn-create" id="btn-create-room">Create Room</button>
+          <div class="toggle-container" id="toggle-public">
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-public-input">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label" id="toggle-label">Private</span>
+          </div>
+        </div>
+
+        <div id="public-games-section">
+          <h3 class="public-games-heading">Public Games</h3>
+          <div id="online-player-count" style="text-align:center; font-size:0.95em; color:#aaa; margin-bottom:8px">0 Players Online</div>
+          <div id="public-games-list" class="public-games-list">
+            <div class="public-games-empty">No public games available</div>
+          </div>
+          <button class="btn btn-refresh" id="btn-refresh-public" style="width:100%; margin-top:8px">Refresh List</button>
+        </div>
+
+        <div class="input-group">
+          <input type="text" id="input-room-code" placeholder="Room Code (e.g. ABCDEF)" maxlength="6" style="text-transform:uppercase; letter-spacing:4px; text-align:center" autocomplete="off">
+        </div>
+
+        <button class="btn btn-join" id="btn-join-room" style="width:100%; margin-bottom:12px">Join Private Room</button>
+
+        <button class="btn btn-computer" id="btn-play-computer" style="width:100%">Play Against Computer</button>
       </div>
 
-      <div class="input-group">
-        <input type="text" id="input-username" placeholder="Your Name" maxlength="20" autocomplete="off">
-      </div>
-
-      <div class="create-room-row">
-        <button class="btn btn-create" id="btn-create-room">Create Room</button>
-        <div class="toggle-container" id="toggle-public">
-          <label class="toggle-switch">
-            <input type="checkbox" id="toggle-public-input">
-            <span class="toggle-slider"></span>
-          </label>
-          <span class="toggle-label" id="toggle-label">Private</span>
+      <!-- Global Chat -->
+      <div id="global-chat-panel">
+        <div class="global-chat-header">Global Chat</div>
+        <div id="global-chat-messages"></div>
+        <div id="global-chat-name-row">
+          <input type="text" id="global-chat-name" placeholder="Your name" maxlength="20" autocomplete="off">
+        </div>
+        <div id="global-chat-input-row">
+          <input type="text" id="global-chat-input" placeholder="Type a message..." maxlength="200" autocomplete="off">
+          <button id="global-chat-send-btn" onclick="UI.sendGlobalChat()">Send</button>
         </div>
       </div>
-
-      <div id="public-games-section">
-        <h3 class="public-games-heading">Public Games</h3>
-        <div id="online-player-count" style="text-align:center; font-size:0.95em; color:#aaa; margin-bottom:8px">0 Players Online</div>
-        <div id="public-games-list" class="public-games-list">
-          <div class="public-games-empty">No public games available</div>
-        </div>
-        <button class="btn btn-refresh" id="btn-refresh-public" style="width:100%; margin-top:8px">Refresh List</button>
-      </div>
-
-      <div class="input-group">
-        <input type="text" id="input-room-code" placeholder="Room Code (e.g. ABCDEF)" maxlength="6" style="text-transform:uppercase; letter-spacing:4px; text-align:center" autocomplete="off">
-      </div>
-
-      <button class="btn btn-join" id="btn-join-room" style="width:100%; margin-bottom:12px">Join Private Room</button>
-
-      <button class="btn btn-computer" id="btn-play-computer" style="width:100%">Play Against Computer</button>
     </div>
 
     <!-- Computer setup overlay -->
@@ -233,6 +248,7 @@
         }
 
         UI.showToast('Connected to Supabase!');
+        UI.initGlobalChat();
       } catch (err) {
         UI.showError('Connection failed: ' + err.message);
         console.error(err);
