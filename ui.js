@@ -930,8 +930,8 @@ const UI = (() => {
       const myPlayer = state.players.find(p => p.id === myId);
       const hasJSN = myPlayer?.hand?.some(c => c.actionType === 'just_say_no');
 
-      // Check if this is a Just Say No response (someone played JSN)
-      const isJsnResponse = !!pending.lastJsnPlayer;
+      // Check if this is a Just Say No response (another player played JSN)
+      const isJsnResponse = pending.lastJsnPlayer && pending.lastJsnPlayer !== myId;
       let title, description;
       if (isJsnResponse) {
         const jsnPlayerName = escapeHtml(names[pending.lastJsnPlayer] || 'Opponent');
