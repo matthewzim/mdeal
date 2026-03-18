@@ -20,23 +20,6 @@
   <!-- LOGIN SCREEN                                                  -->
   <!-- ══════════════════════════════════════════════════════════════ -->
   <div id="login-screen" class="screen active">
-    <!-- Player Stats Dashboard (upper-right corner) -->
-    <div id="player-stats-dashboard" class="stats-dashboard">
-      <div class="stats-row">
-        <div class="stat-item">
-          <div class="stat-value" id="stat-games">0</div>
-          <div class="stat-label">Games</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="stat-winrate">0%</div>
-          <div class="stat-label">Win Rate</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="stat-elo">1200</div>
-          <div class="stat-label">Rating</div>
-        </div>
-      </div>
-    </div>
 
     <div class="login-layout">
       <div class="login-box">
@@ -81,16 +64,35 @@
         <button class="btn btn-computer" id="btn-play-computer" style="width:100%">Play Against Computer</button>
       </div>
 
-      <!-- Global Chat -->
-      <div id="global-chat-panel">
-        <div class="global-chat-header">Global Chat</div>
-        <div id="global-chat-messages"></div>
-        <div id="global-chat-name-row">
-          <input type="text" id="global-chat-name" placeholder="Your name" maxlength="20" autocomplete="off">
+      <!-- Right side column: Stats + Global Chat -->
+      <div class="right-side-column">
+        <div id="player-stats-dashboard" class="stats-dashboard">
+          <div class="stats-row">
+            <div class="stat-item">
+              <div class="stat-value" id="stat-games">0</div>
+              <div class="stat-label">Games</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="stat-winrate">0%</div>
+              <div class="stat-label">Win Rate</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="stat-elo">1200</div>
+              <div class="stat-label">Rating</div>
+            </div>
+          </div>
         </div>
-        <div id="global-chat-input-row">
-          <input type="text" id="global-chat-input" placeholder="Type a message..." maxlength="200" autocomplete="off">
-          <button id="global-chat-send-btn" onclick="UI.sendGlobalChat()">Send</button>
+
+        <div id="global-chat-panel">
+          <div class="global-chat-header">Global Chat</div>
+          <div id="global-chat-messages"></div>
+          <div id="global-chat-name-row">
+            <input type="text" id="global-chat-name" placeholder="Your name" maxlength="20" autocomplete="off">
+          </div>
+          <div id="global-chat-input-row">
+            <input type="text" id="global-chat-input" placeholder="Type a message..." maxlength="200" autocomplete="off">
+            <button id="global-chat-send-btn" onclick="UI.sendGlobalChat()">Send</button>
+          </div>
         </div>
       </div>
     </div>
