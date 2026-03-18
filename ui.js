@@ -2134,12 +2134,37 @@ const UI = (() => {
 
   // ── Global Chat ─────────────────────────────────────────────────────
 
+  const GLOBAL_CHAT_STORAGE_KEY = 'mdeal_global_chat';
+
   let globalChatMessages = [];
 
+  function loadGlobalChatMessages() {
+    try {
+      const raw = localStorage.getItem(GLOBAL_CHAT_STORAGE_KEY);
+      if (raw) {
+        globalChatMessages = JSON.parse(raw);
+      }
+    } catch (e) {
+      globalChatMessages = [];
+    }
+  }
+
+  function saveGlobalChatMessages() {
+    try {
+      localStorage.setItem(GLOBAL_CHAT_STORAGE_KEY, JSON.stringify(globalChatMessages));
+    } catch (e) {
+      // Storage full or unavailable — silently ignore
+    }
+  }
+
   function initGlobalChat() {
+    loadGlobalChatMessages();
+    renderGlobalChatMessages();
+
     SupabaseClient.subscribeToGlobalChat((msg) => {
       globalChatMessages.push(msg);
       if (globalChatMessages.length > 100) globalChatMessages.shift();
+      saveGlobalChatMessages();
       renderGlobalChatMessages();
     });
 
@@ -2201,6 +2226,7 @@ const UI = (() => {
 
     globalChatMessages.push(msg);
     if (globalChatMessages.length > 100) globalChatMessages.shift();
+    saveGlobalChatMessages();
     renderGlobalChatMessages();
 
     SupabaseClient.sendGlobalChatMessage(msg);
