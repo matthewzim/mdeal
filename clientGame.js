@@ -18,6 +18,58 @@ const ClientGame = (() => {
   let roomIsPublic = false;
   let gameMode = 'regular'; // 'regular' or 'nomercy'
 
+  // ── Client-side Prediction (Optimistic Updates) ───────────────────
+  // Immediately apply moves locally, then reconcile with server state.
+
+  function deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  /**
+   * Apply a game action optimistically: predict locally, render immediately,
+   * then sync with the server. On server error, rollback to pre-action state.
+   *
+   * @param {Function} predictFn - (state) => void, mutates state via GameEngine
+   * @param {Function} serverCallFn - async () => result from server
+   * @param {Object} [renderOptions] - options passed to UI.renderGame
+   * @returns {Object|null} server result, or null on error
+   */
+  async function withOptimisticUpdate(predictFn, serverCallFn, renderOptions) {
+    const snapshot = deepClone(gameState);
+    let predicted = false;
+
+    // Apply prediction locally (only if we have full state with actual deck)
+    try {
+      if (Array.isArray(gameState.deck)) {
+        predictFn(gameState);
+        UI.renderGame(GameEngine.getPlayerView(gameState, playerId), playerId, playerNames, renderOptions);
+        predicted = true;
+      }
+    } catch (_e) {
+      // Prediction failed (e.g. validation error), restore and let server handle it
+      gameState = snapshot;
+    }
+
+    // Send to server (authoritative)
+    try {
+      const result = await serverCallFn();
+      if (result && result.state) {
+        gameState = result.state;
+        // Only re-render if we didn't predict, or to reconcile with server truth
+        UI.renderGame(gameState, playerId, playerNames, renderOptions);
+      }
+      return result;
+    } catch (err) {
+      // Rollback on server error
+      gameState = snapshot;
+      if (predicted) {
+        UI.renderGame(GameEngine.getPlayerView(gameState, playerId), playerId, playerNames);
+      }
+      UI.showError(err.message);
+      return null;
+    }
+  }
+
   // ── Persistent Anonymous Player ID ──────────────────────────────────
   const PLAYER_ID_KEY = 'mdeal_player_id';
   const USERNAME_KEY = 'mdeal_username';
@@ -251,204 +303,136 @@ const ClientGame = (() => {
   // ── Game actions ─────────────────────────────────────────────────────
 
   async function drawCards() {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'draw');
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames, { animateHand: true });
-      }
-      if (result.drawnCards) {
-        UI.showDrawnCards(result.drawnCards);
-      }
-    } catch (err) {
-      UI.showError(err.message);
+    const result = await withOptimisticUpdate(
+      (state) => GameEngine.startTurn(state),
+      () => SupabaseClient.playCard(gameId, 'draw'),
+      { animateHand: true }
+    );
+    if (result && result.drawnCards) {
+      UI.showDrawnCards(result.drawnCards);
     }
   }
 
   async function playProperty(cardId, chosenColor) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'play_property', { cardId, chosenColor });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playProperty(state, playerId, cardId, chosenColor),
+      () => SupabaseClient.playCard(gameId, 'play_property', { cardId, chosenColor })
+    );
   }
 
   async function bankCard(cardId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'bank', { cardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.bankCard(state, playerId, cardId),
+      () => SupabaseClient.playCard(gameId, 'bank', { cardId })
+    );
   }
 
   async function playHouseHotel(cardId, targetColor) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'play_house_hotel', { cardId, targetColor });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playHouseHotel(state, playerId, cardId, targetColor),
+      () => SupabaseClient.playCard(gameId, 'play_house_hotel', { cardId, targetColor })
+    );
   }
 
   async function playPassGo(cardId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'pass_go', { cardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
+    const result = await withOptimisticUpdate(
+      (state) => GameEngine.playPassGo(state, playerId, cardId),
+      () => SupabaseClient.playCard(gameId, 'pass_go', { cardId })
+    );
+    if (result && result.drawnCards) {
+      UI.showDrawnCards(result.drawnCards);
     }
   }
 
   async function playRent(cardId, targetColor, doubleCardId, targetId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'rent', { cardId, targetColor, doubleCardId, targetId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playRent(state, playerId, cardId, targetColor, doubleCardId || null, targetId || null),
+      () => SupabaseClient.playCard(gameId, 'rent', { cardId, targetColor, doubleCardId, targetId })
+    );
   }
 
   async function playDebtCollector(cardId, targetId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'debt_collector', { cardId, targetId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playDebtCollector(state, playerId, cardId, targetId),
+      () => SupabaseClient.playCard(gameId, 'debt_collector', { cardId, targetId })
+    );
   }
 
   async function playBirthday(cardId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'birthday', { cardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playBirthday(state, playerId, cardId),
+      () => SupabaseClient.playCard(gameId, 'birthday', { cardId })
+    );
   }
 
   async function playSlyDeal(cardId, targetId, targetCardId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'sly_deal', { cardId, targetId, targetCardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playSlyDeal(state, playerId, cardId, targetId, targetCardId),
+      () => SupabaseClient.playCard(gameId, 'sly_deal', { cardId, targetId, targetCardId })
+    );
   }
 
   async function playForcedDeal(cardId, targetId, targetCardId, myCardId) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'forced_deal', { cardId, targetId, targetCardId, myCardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playForcedDeal(state, playerId, cardId, targetId, targetCardId, myCardId),
+      () => SupabaseClient.playCard(gameId, 'forced_deal', { cardId, targetId, targetCardId, myCardId })
+    );
   }
 
   async function playDealBreaker(cardId, targetId, targetColor) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'deal_breaker', { cardId, targetId, targetColor });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.playDealBreaker(state, playerId, cardId, targetId, targetColor),
+      () => SupabaseClient.playCard(gameId, 'deal_breaker', { cardId, targetId, targetColor })
+    );
   }
 
   async function moveWild(cardId, chosenColor) {
-    try {
-      const result = await SupabaseClient.playCard(gameId, 'move_wild', { cardId, chosenColor });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.moveWild(state, playerId, cardId, chosenColor),
+      () => SupabaseClient.playCard(gameId, 'move_wild', { cardId, chosenColor })
+    );
   }
 
   async function endTurn(discardCardIds) {
-    try {
-      const result = await SupabaseClient.endTurn(gameId, discardCardIds);
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
+    const result = await withOptimisticUpdate(
+      (state) => {
+        if (state.phase === 'discard' && discardCardIds && discardCardIds.length > 0) {
+          GameEngine.discardCards(state, playerId, discardCardIds);
+        } else {
+          GameEngine.endTurn(state);
+        }
+      },
+      () => SupabaseClient.endTurn(gameId, discardCardIds)
+    );
+    if (result) {
       if (result.needsDiscard) {
         UI.showDiscardPrompt(result.excess);
       }
       if (result.winner) {
         UI.showWinner(result.winner, playerNames);
       }
-    } catch (err) {
-      UI.showError(err.message);
     }
   }
 
   async function respondJustSayNo(cardId) {
-    try {
-      const result = await SupabaseClient.respondAction(gameId, 'just_say_no', { cardId });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.respondJustSayNo(state, playerId, cardId),
+      () => SupabaseClient.respondAction(gameId, 'just_say_no', { cardId })
+    );
   }
 
   async function respondAccept() {
-    try {
-      const result = await SupabaseClient.respondAction(gameId, 'accept');
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.respondAccept(state, playerId),
+      () => SupabaseClient.respondAction(gameId, 'accept')
+    );
   }
 
   async function makePayment(bankCardIds, propertyCardIds) {
-    try {
-      const result = await SupabaseClient.respondAction(gameId, 'pay', { bankCardIds, propertyCardIds });
-      if (result.state) {
-        gameState = result.state;
-        UI.renderGame(gameState, playerId, playerNames);
-      }
-    } catch (err) {
-      UI.showError(err.message);
-    }
+    await withOptimisticUpdate(
+      (state) => GameEngine.makePayment(state, playerId, bankCardIds, propertyCardIds),
+      () => SupabaseClient.respondAction(gameId, 'pay', { bankCardIds, propertyCardIds })
+    );
   }
 
   // ── Local (vs Computer) game mode ──────────────────────────────────
@@ -807,10 +791,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayShack(cardId, targetColor);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'play_shack', { cardId, targetColor });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playShack(state, playerId, cardId, targetColor),
+        () => SupabaseClient.playCard(gameId, 'play_shack', { cardId, targetColor })
+      );
     }
   }
 
@@ -818,10 +802,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayNmPassGo(cardId);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playNmPassGo(state, playerId, cardId),
+        () => SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId })
+      );
     }
   }
 
@@ -829,10 +813,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayNmRent(cardId, targetColor, doubleCardId);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'nm_rent', { cardId, targetColor, doubleCardId });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playNmRent(state, playerId, cardId, targetColor, doubleCardId || null),
+        () => SupabaseClient.playCard(gameId, 'nm_rent', { cardId, targetColor, doubleCardId })
+      );
     }
   }
 
@@ -840,10 +824,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayDoubleRentAlone(cardId, targetColor);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'double_rent_alone', { cardId, targetColor });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playDoubleRentAlone(state, playerId, cardId, targetColor),
+        () => SupabaseClient.playCard(gameId, 'double_rent_alone', { cardId, targetColor })
+      );
     }
   }
 
@@ -851,10 +835,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlaySuperSlyDeal(cardId, targetColor);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'super_sly_deal', { cardId, targetColor });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playSuperSlyDeal(state, playerId, cardId, targetColor),
+        () => SupabaseClient.playCard(gameId, 'super_sly_deal', { cardId, targetColor })
+      );
     }
   }
 
@@ -862,10 +846,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayRepossession(cardId, targetId);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'repossession', { cardId, targetId });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playRepossession(state, playerId, cardId, targetId),
+        () => SupabaseClient.playCard(gameId, 'repossession', { cardId, targetId })
+      );
     }
   }
 
@@ -873,10 +857,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayToughLuck(cardId, targetId, cardType);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'tough_luck', { cardId, targetId, cardType });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playToughLuck(state, playerId, cardId, targetId, cardType),
+        () => SupabaseClient.playCard(gameId, 'tough_luck', { cardId, targetId, cardType })
+      );
     }
   }
 
@@ -884,10 +868,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayYoink(cardId, targetId);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'yoink', { cardId, targetId });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playYoink(state, playerId, cardId, targetId),
+        () => SupabaseClient.playCard(gameId, 'yoink', { cardId, targetId })
+      );
     }
   }
 
@@ -895,10 +879,10 @@ const ClientGame = (() => {
     if (isLocalGame) {
       localPlayUnfairTrade(cardId, targetId);
     } else {
-      try {
-        const result = await SupabaseClient.playCard(gameId, 'unfair_trade', { cardId, targetId });
-        if (result.state) { gameState = result.state; UI.renderGame(gameState, playerId, playerNames); }
-      } catch (err) { UI.showError(err.message); }
+      await withOptimisticUpdate(
+        (state) => GameEngine.playUnfairTrade(state, playerId, cardId, targetId),
+        () => SupabaseClient.playCard(gameId, 'unfair_trade', { cardId, targetId })
+      );
     }
   }
 
