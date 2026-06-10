@@ -174,11 +174,13 @@ serve(async (req) => {
     state.turnDrawn = false;
     state.log.push({ type: 'end_turn', player: playerId });
 
-    await saveState(supabase, gameId, state);
-    await supabase.from("moves").insert({
-      game_id: gameId, player_id: playerId,
-      move_type: 'end_turn', move_data: {},
-    });
+    await Promise.all([
+      saveState(supabase, gameId, state),
+      supabase.from("moves").insert({
+        game_id: gameId, player_id: playerId,
+        move_type: 'end_turn', move_data: {},
+      }),
+    ]);
 
     return new Response(
       JSON.stringify({ state: playerView(state, playerId) }),

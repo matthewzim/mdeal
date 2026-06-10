@@ -172,13 +172,11 @@ serve(async (req) => {
       state.turnDrawn = true;
       state.log.push({ type: 'draw', player: playerId, count: drawn.length });
 
-      // Save and return drawn cards
-      await saveState(supabase, gameId, state);
-      // Record move
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'draw', move_data: { count: drawn.length },
-      });
+      // Save state and record move in parallel, then return drawn cards
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'draw', { count: drawn.length }),
+      ]);
 
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
@@ -219,8 +217,10 @@ serve(async (req) => {
       state.log.push({ type: 'play_property', player: playerId, card: removed.name, color: removed.currentColor || removed.color });
 
       checkWin(state, playerId);
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_property', { cardId, chosenColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'play_property', { cardId, chosenColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -236,8 +236,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'bank', player: playerId, card: removed.name, value: removed.value });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'bank', { cardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'bank', { cardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -251,8 +253,10 @@ serve(async (req) => {
       const drawn = drawCards(state, playerId, 2);
       state.log.push({ type: 'pass_go', player: playerId, drawn: drawn.length });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'pass_go', { cardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'pass_go', { cardId }),
+      ]);
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
 
@@ -309,8 +313,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rent, doubled: !!doubleCardId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'rent', { cardId, targetColor, doubleCardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'rent', { cardId, targetColor, doubleCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -333,8 +339,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'debt_collector', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'debt_collector', { cardId, targetId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'debt_collector', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -356,8 +364,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'birthday', player: playerId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'birthday', { cardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'birthday', { cardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -383,8 +393,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'sly_deal', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'sly_deal', { cardId, targetId, targetCardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'sly_deal', { cardId, targetId, targetCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -413,8 +425,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'forced_deal', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'forced_deal', { cardId, targetId, targetCardId, myCardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'forced_deal', { cardId, targetId, targetCardId, myCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -438,8 +452,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'deal_breaker', player: playerId, target: targetId, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'deal_breaker', { cardId, targetId, targetColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'deal_breaker', { cardId, targetId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -462,8 +478,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'play_house_hotel', player: playerId, card: removed.name, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_house_hotel', { cardId, targetColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'play_house_hotel', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -497,8 +515,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'play_shack', player: playerId, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_shack', { cardId, targetColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'play_shack', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -513,8 +533,10 @@ serve(async (req) => {
       const drawn = drawCards(state, playerId, drawCount);
       state.log.push({ type: 'nm_pass_go', player: playerId, drawn: drawn.length });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'nm_pass_go', { cardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'nm_pass_go', { cardId }),
+      ]);
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
 
@@ -556,8 +578,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'nm_rent', player: playerId, color: targetColor, amount: rent, doubled: !!doubleCardId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'nm_rent', { cardId, targetColor, doubleCardId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'nm_rent', { cardId, targetColor, doubleCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -587,8 +611,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rent, doubled: true });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'double_rent_alone', { cardId, targetColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'double_rent_alone', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -617,8 +643,10 @@ serve(async (req) => {
         state.phase = 'play';
       }
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'super_sly_deal', { cardId, targetColor });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'super_sly_deal', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -642,8 +670,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'repossession', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'repossession', { cardId, targetId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'repossession', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -667,8 +697,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'tough_luck', player: playerId, target: targetId, cardType });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'tough_luck', { cardId, targetId, cardType });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'tough_luck', { cardId, targetId, cardType }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -692,8 +724,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'yoink', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'yoink', { cardId, targetId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'yoink', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -717,8 +751,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'unfair_trade', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'unfair_trade', { cardId, targetId });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        recordMove(supabase, gameId, playerId, 'unfair_trade', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 

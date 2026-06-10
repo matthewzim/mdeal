@@ -28,6 +28,20 @@ const UI = (() => {
   let selectedDiscards = [];
   let actionTargetMode = null; // for targeting actions
   let lastRenderedHandIds = null; // track hand card IDs to avoid unnecessary re-renders
+  // Per-zone render signatures: skip innerHTML rebuilds (and the resulting
+  // image flicker / listener churn) when a zone's data hasn't changed.
+  let renderSig = {};
+
+  function zoneUnchanged(zone, sig) {
+    if (renderSig[zone] === sig) return true;
+    renderSig[zone] = sig;
+    return false;
+  }
+
+  function resetRenderCache() {
+    renderSig = {};
+    lastRenderedHandIds = null;
+  }
   let playedCardFadeTimeout = null; // track showPlayedCard timeouts to avoid overlap
   let playedCardCleanTimeout = null;
   let lastActionCard = null; // track the last action card played (for center display)
@@ -38,10 +52,9 @@ const UI = (() => {
   let timerInterval = null;
   let timerSecondsLeft = TIMER_DURATION;
   let timerActive = false;
+  let timerKey = null;
 
   function startTimer(state, myId) {
-    stopTimer();
-
     // Only run timer in online play and when it's my turn
     if (ClientGame.isComputerGame()) {
       hideTimer();
@@ -53,10 +66,18 @@ const UI = (() => {
 
     // Only show timer for actionable phases on my turn
     if (!isMyTurn || (phase !== 'draw' && phase !== 'play' && phase !== 'discard')) {
+      timerKey = null;
       hideTimer();
       return;
     }
 
+    // Reset the countdown per move (log grows on each play), but not on
+    // unrelated re-renders, which would silently refill the timer.
+    const key = state.currentPlayer + '|' + phase + '|' + ((state.log && state.log.length) || 0);
+    if (timerActive && key === timerKey) return;
+    timerKey = key;
+
+    stopTimer();
     timerSecondsLeft = TIMER_DURATION;
     timerActive = true;
     showTimer();
@@ -150,12 +171,17 @@ const UI = (() => {
 
   function showLoginScreen() { showScreen('login-screen'); }
   function showLobbyScreen() { showScreen('lobby-screen'); }
-  function showGameScreen() { showScreen('game-screen'); }
+  function showGameScreen() {
+    resetRenderCache();
+    preloadCardImages();
+    showScreen('game-screen');
+  }
 
   function exitGame() {
     if (!confirm('Are you sure you want to exit the game?')) return;
     ClientGame.clearActiveSession();
     SupabaseClient.unsubscribeAll();
+    resetRenderCache();
     // Hide game-specific panels
     const chatPanel = document.getElementById('chat-panel');
     if (chatPanel) chatPanel.classList.remove('active');
@@ -444,6 +470,14 @@ const UI = (() => {
   }
 
   function renderOpponents(opponents, names, state) {
+    // Skip the rebuild when nothing an opponent panel displays has changed
+    const sig = state.currentPlayer + '|' + JSON.stringify(opponents.map(o => [
+      o.id, names[o.id], o.hand.length,
+      o.bank.map(c => c.id),
+      o.properties.map(c => [c.id, c.currentColor || c.color, c.attachedColor]),
+    ]));
+    if (zoneUnchanged('opponents', sig)) return;
+
     const positions = ['left', 'top', 'right', 'top-left']; // clockwise: main → left → top → right
     // Clear all opponent seats
     for (const pos of positions) {
@@ -599,7 +633,15 @@ const UI = (() => {
         } else if (card.type === 'property') {
           el.addEventListener('click', () => _doPlayProperty(card.id));
         } else {
-          el.addEventListener('click', () => showCardActions(card, state, player));
+          el.addEventListener('click', () => {
+            // Resolve fresh state at click time: the board (rent amounts,
+            // targets, completed sets) may have changed since this hand
+            // render, even though the hand itself did not.
+            const freshState = ClientGame.getGameView();
+            const freshPlayer = freshState?.players?.find(p => p.id === player.id);
+            if (!freshState || !freshPlayer) return;
+            showCardActions(card, freshState, freshPlayer);
+          });
         }
       }
 
@@ -609,10 +651,18 @@ const UI = (() => {
 
   function renderMyProperties(player, state, myId) {
     const container = document.getElementById('my-properties');
-    container.innerHTML = '';
-    if (!player) return;
+    if (!player) {
+      container.innerHTML = '';
+      renderSig.myProps = null;
+      return;
+    }
 
     const isMyTurn = state && state.currentPlayer === myId;
+    const sig = isMyTurn + '|' + (actionTargetMode || '') + '|' + JSON.stringify(
+      player.properties.map(c => [c.id, c.currentColor || c.color, c.attachedColor])
+    );
+    if (zoneUnchanged('myProps', sig)) return;
+    container.innerHTML = '';
     const groups = groupProperties(player.properties);
     for (const [color, cards] of Object.entries(groups)) {
       const groupEl = document.createElement('div');
@@ -696,8 +746,14 @@ const UI = (() => {
 
   function renderMyBank(player) {
     const container = document.getElementById('my-bank');
+    if (!player) {
+      container.innerHTML = '';
+      renderSig.myBank = null;
+      return;
+    }
+    const sig = player.bank.map(c => c.id).join(',');
+    if (zoneUnchanged('myBank', sig)) return;
     container.innerHTML = '';
-    if (!player) return;
 
     const total = player.bank.reduce((s, c) => s + c.value, 0);
     const header = document.createElement('div');
@@ -719,6 +775,9 @@ const UI = (() => {
     const el = document.getElementById('game-info');
     const currentName = names[state.currentPlayer] || 'Unknown';
     const isMyTurn = state.currentPlayer === myId;
+    const deckCount = typeof state.deck === 'number' ? state.deck : state.deck?.length || 0;
+    const sig = [state.currentPlayer, state.turnPlaysRemaining, state.phase, deckCount, isMyTurn].join('|');
+    if (zoneUnchanged('gameInfo', sig)) return;
 
     el.innerHTML = `
       <div class="info-row ${isMyTurn ? 'my-turn' : ''}">
@@ -743,6 +802,9 @@ const UI = (() => {
   function renderGameLog(log, names) {
     const el = document.getElementById('game-log');
     if (!log) return;
+
+    const sig = log.length + '|' + JSON.stringify(log[log.length - 1] || null);
+    if (zoneUnchanged('gameLog', sig)) return;
 
     // Show last 20 entries
     const recent = log.slice(-20).reverse();
@@ -792,6 +854,8 @@ const UI = (() => {
     if (!container || !state) return;
 
     const deckCount = typeof state.deck === 'number' ? state.deck : (state.deck?.length || 0);
+    const sig = deckCount + '|' + (lastActionCard ? lastActionCard.id : '');
+    if (zoneUnchanged('deckDiscard', sig)) return;
     let html = '';
 
     // Last action card (slightly to the left)
@@ -833,6 +897,9 @@ const UI = (() => {
 
   function renderActionBar(state, myId) {
     const bar = document.getElementById('action-bar');
+    const sig = [state.phase, state.currentPlayer === myId, discardMode,
+      discardNeeded, selectedDiscards.length].join('|');
+    if (zoneUnchanged('actionBar', sig)) return;
     bar.innerHTML = '';
 
     if (state.phase === 'finished') return;
@@ -889,9 +956,25 @@ const UI = (() => {
     const pending = state.pendingAction;
 
     if (!pending) {
-      overlay.style.display = 'none';
+      // Only clear the overlay if we put a pending-action UI there —
+      // otherwise we'd close unrelated dialogs (card action menus etc.)
+      if (renderSig.pendingAction) {
+        overlay.style.display = 'none';
+      }
+      renderSig.pendingAction = null;
       return;
     }
+
+    // Rebuild only when the pending action (or the assets we can pay with)
+    // changes — this also preserves in-progress payment selections.
+    const me = state.players.find(p => p.id === myId);
+    const sig = JSON.stringify([
+      pending, state.phase,
+      me ? me.bank.map(c => c.id) : null,
+      me ? me.properties.map(c => c.id) : null,
+      me?.hand?.some?.(c => c.actionType === 'just_say_no') || false,
+    ]);
+    if (zoneUnchanged('pendingAction', sig)) return;
 
     // Am I involved?
     const isResponder = pending.currentResponder === myId;
@@ -1395,6 +1478,9 @@ const UI = (() => {
   function _closeOverlay() {
     document.getElementById('action-overlay').style.display = 'none';
     actionTargetMode = null;
+    // The overlay is gone, so force the next pending-action render to rebuild
+    // (it may need to re-show a respond/pay UI after a failed prediction).
+    renderSig.pendingAction = null;
   }
 
   function _getCardFromHand(cardId) {
@@ -1726,8 +1812,8 @@ const UI = (() => {
   // No Mercy card image overrides (maps card names to nomercy/ folder files)
   const NM_CARD_IMAGE_MAP = {
     // Properties (same names, nomercy art)
-    'Mediterranean Ave': 'mediterranean.png',
-    'Baltic Ave': 'baltic.png',
+    // Note: Mediterranean/Baltic have no nomercy art; they fall through
+    // to the regular assets below.
     'Oriental Ave': 'oriental.png',
     'Vermont Ave': 'vermont.png',
     'Connecticut Ave': 'connecticut.png',
@@ -1802,6 +1888,44 @@ const UI = (() => {
       if (RENT_COLOR_IMAGE_MAP[key]) return 'assets/cards/' + RENT_COLOR_IMAGE_MAP[key];
     }
     return null;
+  }
+
+  // ── Card image preloading ────────────────────────────────────────────
+  // Warm the browser cache during idle time when a game starts, so the
+  // played-card pop animation never stalls on a first-time image fetch.
+
+  const preloadedModes = new Set();
+
+  function preloadCardImages() {
+    const mode = _isNoMercyMode() ? 'nomercy' : 'regular';
+    if (preloadedModes.has(mode)) return;
+    preloadedModes.add(mode);
+
+    const paths = new Set(['assets/cards/back-cover.png']);
+    if (mode === 'nomercy') {
+      for (const f of Object.values(NM_CARD_IMAGE_MAP)) paths.add('assets/cards/nomercy/' + f);
+      for (const v of [1, 2, 4, 5, 10, 15]) paths.add('assets/cards/nomercy/' + v + 'M.png');
+    } else {
+      for (const f of Object.values(CARD_IMAGE_MAP)) paths.add('assets/cards/' + f);
+      for (const f of Object.values(RENT_COLOR_IMAGE_MAP)) paths.add('assets/cards/' + f);
+      for (const v of [1, 2, 3, 4, 5, 10]) paths.add('assets/cards/cash-' + v + 'M.png');
+    }
+
+    const list = [...paths];
+    let i = 0;
+    function loadChunk() {
+      const end = Math.min(i + 10, list.length);
+      for (; i < end; i++) {
+        const img = new Image();
+        img.src = list[i];
+      }
+      if (i < list.length) schedule();
+    }
+    function schedule() {
+      if (window.requestIdleCallback) requestIdleCallback(loadChunk);
+      else setTimeout(loadChunk, 50);
+    }
+    schedule();
   }
 
   // ── Card element creation ────────────────────────────────────────────

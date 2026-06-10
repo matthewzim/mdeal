@@ -25,24 +25,58 @@ const ClientGame = (() => {
     return JSON.parse(JSON.stringify(obj));
   }
 
+  // A "full" state carries the actual deck array (local games, or online
+  // state read straight from the games table). A "view" state (returned by
+  // edge functions) has deck as a count and opponents' hands hidden.
+  function isFullState(state) {
+    return !!state && Array.isArray(state.deck);
+  }
+
+  // Render-safe view of whatever state shape we currently hold.
+  function toView(state) {
+    return isFullState(state) ? GameEngine.getPlayerView(state, playerId) : state;
+  }
+
+  // Monotonic sequence for staleness checks: every action appends to the
+  // game log, so a state with a shorter log is older.
+  function stateSeq(state) {
+    return (state && state.log && state.log.length) || 0;
+  }
+
+  // Accept an incoming authoritative state unless it is older than what we
+  // already show (e.g. a realtime event for move N arriving after we have
+  // already predicted move N+1). Returns true if the state was applied.
+  function applyServerState(state, renderOptions) {
+    if (!state) return false;
+    if (gameState && stateSeq(state) < stateSeq(gameState)) return false;
+    gameState = state;
+    UI.renderGame(toView(gameState), playerId, playerNames, renderOptions);
+    return true;
+  }
+
   /**
    * Apply a game action optimistically: predict locally, render immediately,
    * then sync with the server. On server error, rollback to pre-action state.
    *
+   * Prediction runs on both full states and server views — the engine
+   * mutators only need the deck for actions that draw cards, which callers
+   * mark with opts.requiresDeck.
+   *
    * @param {Function} predictFn - (state) => void, mutates state via GameEngine
    * @param {Function} serverCallFn - async () => result from server
    * @param {Object} [renderOptions] - options passed to UI.renderGame
+   * @param {Object} [opts] - { requiresDeck: true } for actions that draw
    * @returns {Object|null} server result, or null on error
    */
-  async function withOptimisticUpdate(predictFn, serverCallFn, renderOptions) {
+  async function withOptimisticUpdate(predictFn, serverCallFn, renderOptions, opts) {
     const snapshot = deepClone(gameState);
     let predicted = false;
 
-    // Apply prediction locally (only if we have full state with actual deck)
+    // Apply prediction locally for instant visual feedback
     try {
-      if (Array.isArray(gameState.deck)) {
+      if (gameState && (!opts?.requiresDeck || isFullState(gameState))) {
         predictFn(gameState);
-        UI.renderGame(GameEngine.getPlayerView(gameState, playerId), playerId, playerNames, renderOptions);
+        UI.renderGame(toView(gameState), playerId, playerNames, renderOptions);
         predicted = true;
       }
     } catch (_e) {
@@ -54,16 +88,15 @@ const ClientGame = (() => {
     try {
       const result = await serverCallFn();
       if (result && result.state) {
-        gameState = result.state;
-        // Only re-render if we didn't predict, or to reconcile with server truth
-        UI.renderGame(gameState, playerId, playerNames, renderOptions);
+        // Reconcile with server truth (skipped if we've already moved ahead)
+        applyServerState(result.state, renderOptions);
       }
       return result;
     } catch (err) {
       // Rollback on server error
       gameState = snapshot;
       if (predicted) {
-        UI.renderGame(GameEngine.getPlayerView(gameState, playerId), playerId, playerNames);
+        UI.renderGame(toView(gameState), playerId, playerNames);
       }
       UI.showError(err.message);
       return null;
@@ -155,6 +188,7 @@ const ClientGame = (() => {
   function getRoomId() { return roomId; }
   function getGameId() { return gameId; }
   function getGameState() { return gameState; }
+  function getGameView() { return toView(gameState); }
   function getIsHost() { return isHost; }
   function getPlayerNames() { return playerNames; }
 
@@ -257,7 +291,7 @@ const ClientGame = (() => {
     saveActiveSession();
     subscribeToGameUpdates();
     subscribeToChatUpdates();
-    UI.renderGame(gameState, playerId, playerNames);
+    UI.renderGame(toView(gameState), playerId, playerNames);
   }
 
   function subscribeToChatUpdates() {
@@ -289,13 +323,17 @@ const ClientGame = (() => {
   function subscribeToGameUpdates() {
     if (gameSubscription) return;
     gameSubscription = SupabaseClient.subscribeToGame(gameId, async (payload) => {
-      if (payload.new) {
-        // Refetch the full game to get the state with our hand visible
-        const game = await SupabaseClient.getGame(roomId);
-        if (game) {
-          gameState = game.game_state_json;
-          UI.renderGame(gameState, playerId, playerNames);
-        }
+      if (!payload.new) return;
+      // The realtime payload carries the updated row, so use it directly
+      // instead of refetching (saves a round trip per move).
+      if (payload.new.game_state_json) {
+        applyServerState(payload.new.game_state_json);
+        return;
+      }
+      // Fallback: refetch if the payload was truncated/missing the state
+      const game = await SupabaseClient.getGame(roomId);
+      if (game) {
+        applyServerState(game.game_state_json);
       }
     });
   }
@@ -306,7 +344,8 @@ const ClientGame = (() => {
     const result = await withOptimisticUpdate(
       (state) => GameEngine.startTurn(state),
       () => SupabaseClient.playCard(gameId, 'draw'),
-      { animateHand: true }
+      { animateHand: true },
+      { requiresDeck: true }
     );
     if (result && result.drawnCards) {
       UI.showDrawnCards(result.drawnCards);
@@ -337,7 +376,9 @@ const ClientGame = (() => {
   async function playPassGo(cardId) {
     const result = await withOptimisticUpdate(
       (state) => GameEngine.playPassGo(state, playerId, cardId),
-      () => SupabaseClient.playCard(gameId, 'pass_go', { cardId })
+      () => SupabaseClient.playCard(gameId, 'pass_go', { cardId }),
+      undefined,
+      { requiresDeck: true }
     );
     if (result && result.drawnCards) {
       UI.showDrawnCards(result.drawnCards);
@@ -804,7 +845,9 @@ const ClientGame = (() => {
     } else {
       await withOptimisticUpdate(
         (state) => GameEngine.playNmPassGo(state, playerId, cardId),
-        () => SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId })
+        () => SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId }),
+        undefined,
+        { requiresDeck: true }
       );
     }
   }
@@ -996,7 +1039,7 @@ const ClientGame = (() => {
 
   return {
     setPlayer, getPlayerId, getUsername, getRoomId, getGameId,
-    getGameState, getIsHost, getPlayerNames, isComputerGame,
+    getGameState, getGameView, getIsHost, getPlayerNames, isComputerGame,
     getRoomIsPublic, getGameMode, setGameMode,
     createRoom, joinRoom, joinPublicRoom, toggleReady, startGame, loadGame,
     refreshRoomPlayers, startLocalGame, sendChat,

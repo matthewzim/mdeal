@@ -156,11 +156,13 @@ serve(async (req) => {
       pending.lastJsnPlayer = playerId;
       state.log.push({ type: 'just_say_no', player: playerId });
 
-      await saveState(supabase, gameId, state);
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'just_say_no', move_data: { cardId },
-      });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        supabase.from("moves").insert({
+          game_id: gameId, player_id: playerId,
+          move_type: 'just_say_no', move_data: { cardId },
+        }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -319,11 +321,13 @@ serve(async (req) => {
         await supabase.from("rooms").update({ status: "finished" }).eq("id", game.room_id);
       }
 
-      await saveState(supabase, gameId, state);
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'payment', move_data: { bankCardIds: bIds, propertyCardIds: pIds },
-      });
+      await Promise.all([
+        saveState(supabase, gameId, state),
+        supabase.from("moves").insert({
+          game_id: gameId, player_id: playerId,
+          move_type: 'payment', move_data: { bankCardIds: bIds, propertyCardIds: pIds },
+        }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
