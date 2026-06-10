@@ -240,7 +240,7 @@
         // Try to reconnect to an active game
         const reconnected = await ClientGame.tryReconnect();
         if (reconnected) {
-          const gs = ClientGame.getGameState();
+          const gs = ClientGame.getGameView();
           if (gs) {
             UI.showGameScreen();
             UI.renderGame(gs, ClientGame.getPlayerId(), ClientGame.getPlayerNames());

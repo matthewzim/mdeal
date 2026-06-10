@@ -2,65 +2,11 @@
 // Handles Just Say No responses and payment for pending actions
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const ALL_COLORS = ['brown','darkblue','lightblue','pink','orange','red','yellow','green','railroad','utility'];
-const SET_REQUIREMENTS: Record<string, number> = {
-  brown: 2, darkblue: 2, lightblue: 3, pink: 3, orange: 3,
-  red: 3, yellow: 3, green: 3, railroad: 4, utility: 2,
-};
-
-function getPlayer(state: any, id: string) {
-  return state.players.find((p: any) => p.id === id);
-}
-
-function countColor(player: any, color: string) {
-  let c = 0;
-  for (const card of player.properties) {
-    if (card.type === 'property' && card.color === color) c++;
-    if (card.type === 'wild_property' && card.currentColor === color) c++;
-  }
-  return c;
-}
-
-function isSetComplete(player: any, color: string) {
-  return countColor(player, color) >= (SET_REQUIREMENTS[color] || 999);
-}
-
-function hasWon(player: any) {
-  let sets = 0;
-  for (const color of ALL_COLORS) if (isSetComplete(player, color)) sets++;
-  return sets >= 3;
-}
-
-function bankTotal(player: any) {
-  return player.bank.reduce((s: number, c: any) => s + c.value, 0);
-}
-
-function propertyTotal(player: any) {
-  return player.properties.reduce((s: number, c: any) => s + c.value, 0);
-}
-
-function totalAssets(player: any) {
-  return bankTotal(player) + propertyTotal(player);
-}
-
-function playerView(state: any, playerId: string) {
-  return {
-    ...state,
-    deck: state.deck.length,
-    players: state.players.map((p: any) => ({
-      ...p,
-      hand: p.id === playerId ? p.hand : p.hand.map(() => ({ id: 'hidden', type: 'hidden' })),
-    })),
-  };
-}
+import {
+  corsHeaders, ok, fail,
+  getPlayer, hasWon, totalAssets, playerView,
+  createServiceClient, authPlayer, loadGameState, saveGameState,
+} from "../_shared/engine.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -68,43 +14,22 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceClient();
 
     const body = await req.json();
     const { gameId, response, cardId, bankCardIds, propertyCardIds } = body;
     // response: 'accept' | 'just_say_no' | 'pay'
 
-    // Auth
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Auth required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const playerId = user.id;
+    const playerId = await authPlayer(supabase, req);
+    if (!playerId) return fail("Auth required", 401);
 
-    // Fetch game
-    const { data: game } = await supabase
-      .from("games").select("*").eq("id", gameId).single();
-    if (!game) {
-      return new Response(JSON.stringify({ error: "Game not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const state = game.game_state_json;
+    const loaded = await loadGameState(supabase, gameId);
+    if (!loaded) return fail("Game not found", 404);
+    const { state, version, roomId } = loaded;
     const pending = state.pendingAction;
 
     if (!pending) {
-      return new Response(JSON.stringify({ error: "No pending action" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return fail("No pending action");
     }
 
     // ── Just Say No ──
@@ -156,11 +81,13 @@ serve(async (req) => {
       pending.lastJsnPlayer = playerId;
       state.log.push({ type: 'just_say_no', player: playerId });
 
-      await saveState(supabase, gameId, state);
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'just_say_no', move_data: { cardId },
-      });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        supabase.from("moves").insert({
+          game_id: gameId, player_id: playerId,
+          move_type: 'just_say_no', move_data: { cardId },
+        }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -233,7 +160,7 @@ serve(async (req) => {
         resolveAction(state);
       }
 
-      await saveState(supabase, gameId, state);
+      await saveGameState(supabase, gameId, state, version);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -316,14 +243,16 @@ serve(async (req) => {
         state.phase = 'finished';
         state.winner = receiver.id;
         state.log.push({ type: 'win', player: receiver.id });
-        await supabase.from("rooms").update({ status: "finished" }).eq("id", game.room_id);
+        await supabase.from("rooms").update({ status: "finished" }).eq("id", roomId);
       }
 
-      await saveState(supabase, gameId, state);
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'payment', move_data: { bankCardIds: bIds, propertyCardIds: pIds },
-      });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        supabase.from("moves").insert({
+          game_id: gameId, player_id: playerId,
+          move_type: 'payment', move_data: { bankCardIds: bIds, propertyCardIds: pIds },
+        }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -462,23 +391,5 @@ function resolveAction(state: any) {
   state.phase = 'play';
 }
 
-async function saveState(supabase: any, gameId: string, state: any) {
-  await supabase.from("games").update({
-    game_state_json: state,
-    current_player: state.currentPlayer,
-  }).eq("id", gameId);
-}
 
-function ok(data: any) {
-  return new Response(
-    JSON.stringify(data),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
 
-function fail(reason: string) {
-  return new Response(
-    JSON.stringify({ error: reason }),
-    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}

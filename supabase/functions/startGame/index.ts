@@ -3,12 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { corsHeaders, publicView } from "../_shared/engine.ts";
 
 // ── Inline game engine (Deno-compatible) ───────────────────────────────
 // We inline the core deck/engine logic since Deno edge functions can't
@@ -291,13 +286,16 @@ serve(async (req) => {
     // Create game state
     const playerIds = roomPlayers.map((rp: any) => rp.player_id);
     const gameState = createInitialState(playerIds, gameMode || 'regular');
+    gameState.seq = 1;
 
-    // Insert game
+    // Insert game: the games row holds only the public (fully redacted)
+    // view that is safe to broadcast; the full state with deck order and
+    // hands goes into game_states, which clients cannot read.
     const { data: game, error: gameError } = await supabase
       .from("games")
       .insert({
         room_id: roomId,
-        game_state_json: gameState,
+        game_state_json: publicView(gameState),
         current_player: gameState.currentPlayer,
       })
       .select()
@@ -306,6 +304,21 @@ serve(async (req) => {
     if (gameError) {
       return new Response(
         JSON.stringify({ error: "Failed to create game", details: gameError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { error: stateError } = await supabase
+      .from("game_states")
+      .insert({
+        game_id: game.id,
+        state_json: gameState,
+        version: 1,
+      });
+
+    if (stateError) {
+      return new Response(
+        JSON.stringify({ error: "Failed to create game state", details: stateError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

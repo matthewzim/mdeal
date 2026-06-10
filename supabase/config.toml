@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.respondAction]
 verify_jwt = false
+
+[functions.getState]
+verify_jwt = false

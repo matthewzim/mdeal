@@ -1,5 +1,12 @@
 -- Monopoly Deal - Supabase Schema
 -- Run this in your Supabase SQL editor
+--
+-- Upgrading an existing deployment: re-run the TABLES and ROW LEVEL
+-- SECURITY sections (both are idempotent — CREATE IF NOT EXISTS and
+-- DROP POLICY IF EXISTS). Skip the REALTIME section if the publication
+-- already includes the tables (ALTER PUBLICATION ... ADD TABLE errors on
+-- duplicates). Do NOT add game_states to the realtime publication — it
+-- holds secret state (deck order, hands) that must never reach clients.
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -34,12 +41,25 @@ CREATE TABLE IF NOT EXISTS room_players (
   UNIQUE (room_id, seat_position)
 );
 
+-- games.game_state_json holds only the PUBLIC view of the game (deck as a
+-- count, all hands hidden). It is safe to read and to broadcast over
+-- realtime. The authoritative state lives in game_states below.
 CREATE TABLE IF NOT EXISTS games (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   room_id         UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   game_state_json JSONB NOT NULL DEFAULT '{}'::jsonb,
   current_player  UUID REFERENCES players(id),
   created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Full authoritative game state: deck order and every player's hand.
+-- No RLS policies are defined, so clients can never read or write it;
+-- only the service role (edge functions) can. The version column provides
+-- optimistic concurrency: every save is conditional on the version read.
+CREATE TABLE IF NOT EXISTS game_states (
+  game_id    UUID PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+  state_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  version    INT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS moves (
@@ -59,47 +79,58 @@ ALTER TABLE players      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rooms        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE games        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_states  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE moves        ENABLE ROW LEVEL SECURITY;
 
--- Players: anyone can read; only the owner can update
+-- All writes except the player's own profile row and ready toggle go
+-- through edge functions, which use the service role and bypass RLS.
+-- Clients therefore get read-only access plus those two updates, and
+-- nothing at all on game_states (no policies = denied).
+
+-- Drop the previous overly-permissive policies if upgrading an existing DB
+DROP POLICY IF EXISTS "Players are viewable by everyone"   ON players;
+DROP POLICY IF EXISTS "Players can insert their own row"   ON players;
+DROP POLICY IF EXISTS "Players can update their own row"   ON players;
+DROP POLICY IF EXISTS "Rooms are viewable by everyone"     ON rooms;
+DROP POLICY IF EXISTS "Rooms insertable via service role"  ON rooms;
+DROP POLICY IF EXISTS "Rooms updatable via service role"   ON rooms;
+DROP POLICY IF EXISTS "Room players viewable"              ON room_players;
+DROP POLICY IF EXISTS "Room players insertable"            ON room_players;
+DROP POLICY IF EXISTS "Room players updatable"             ON room_players;
+DROP POLICY IF EXISTS "Room players deletable"             ON room_players;
+DROP POLICY IF EXISTS "Games viewable by participants"     ON games;
+DROP POLICY IF EXISTS "Games insertable"                   ON games;
+DROP POLICY IF EXISTS "Games updatable"                    ON games;
+DROP POLICY IF EXISTS "Moves viewable"                     ON moves;
+DROP POLICY IF EXISTS "Moves insertable"                   ON moves;
+
+-- Players: anyone can read usernames; only the owner can write their row
 CREATE POLICY "Players are viewable by everyone"
   ON players FOR SELECT USING (true);
 CREATE POLICY "Players can insert their own row"
-  ON players FOR INSERT WITH CHECK (true);
+  ON players FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Players can update their own row"
   ON players FOR UPDATE USING (auth.uid() = id);
 
--- Rooms: anyone can read; service role modifies through edge functions
+-- Rooms: read-only for clients
 CREATE POLICY "Rooms are viewable by everyone"
   ON rooms FOR SELECT USING (true);
-CREATE POLICY "Rooms insertable via service role"
-  ON rooms FOR INSERT WITH CHECK (true);
-CREATE POLICY "Rooms updatable via service role"
-  ON rooms FOR UPDATE USING (true);
 
--- Room players: anyone can read; service role modifies
+-- Room players: readable; a player may update only their own row (ready toggle)
 CREATE POLICY "Room players viewable"
   ON room_players FOR SELECT USING (true);
-CREATE POLICY "Room players insertable"
-  ON room_players FOR INSERT WITH CHECK (true);
-CREATE POLICY "Room players updatable"
-  ON room_players FOR UPDATE USING (true);
-CREATE POLICY "Room players deletable"
-  ON room_players FOR DELETE USING (true);
+CREATE POLICY "Room players can update own row"
+  ON room_players FOR UPDATE USING (auth.uid() = player_id);
 
--- Games: only room participants can read
-CREATE POLICY "Games viewable by participants"
+-- Games: readable (the row holds only the redacted public view)
+CREATE POLICY "Games viewable by everyone"
   ON games FOR SELECT USING (true);
-CREATE POLICY "Games insertable"
-  ON games FOR INSERT WITH CHECK (true);
-CREATE POLICY "Games updatable"
-  ON games FOR UPDATE USING (true);
 
--- Moves: viewable by game participants
+-- Game states: NO client policies — service role only
+
+-- Moves: read-only history
 CREATE POLICY "Moves viewable"
   ON moves FOR SELECT USING (true);
-CREATE POLICY "Moves insertable"
-  ON moves FOR INSERT WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════════════════════════
 -- REALTIME

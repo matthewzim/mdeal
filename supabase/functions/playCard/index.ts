@@ -2,106 +2,12 @@
 // Validates and executes a card play action
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-// ── Inline rules/engine helpers ────────────────────────────────────────
-
-const SET_REQUIREMENTS: Record<string, number> = {
-  brown: 2, darkblue: 2, lightblue: 3, pink: 3, orange: 3,
-  red: 3, yellow: 3, green: 3, railroad: 4, utility: 2,
-};
-
-const RENT_VALUES: Record<string, number[]> = {
-  brown: [1, 2], darkblue: [3, 8], lightblue: [1, 2, 3],
-  pink: [1, 2, 4], orange: [1, 3, 5], red: [2, 3, 6],
-  yellow: [2, 4, 6], green: [2, 4, 7], railroad: [1, 2, 3, 4],
-  utility: [1, 2],
-};
-
-const ALL_COLORS = ['brown','darkblue','lightblue','pink','orange','red','yellow','green','railroad','utility'];
-
-function getPlayer(state: any, id: string) {
-  return state.players.find((p: any) => p.id === id);
-}
-
-function countColor(player: any, color: string) {
-  let count = 0;
-  for (const c of player.properties) {
-    if (c.type === 'property' && c.color === color) count++;
-    if (c.type === 'wild_property' && c.currentColor === color) count++;
-  }
-  return count;
-}
-
-function isSetComplete(player: any, color: string) {
-  const req = SET_REQUIREMENTS[color];
-  return req ? countColor(player, color) >= req : false;
-}
-
-function isInCompletedSet(player: any, card: any) {
-  const color = card.type === 'wild_property' ? card.currentColor : card.color;
-  return isSetComplete(player, color);
-}
-
-function rentAmount(player: any, color: string) {
-  const count = countColor(player, color);
-  const table = RENT_VALUES[color];
-  if (!table || count === 0) return 0;
-  let rent = table[Math.min(count, table.length) - 1];
-  // Add house bonus (3M each), hotel bonus (4M each), shack bonus (5M each)
-  rent += player.properties.filter((c: any) => c.actionType === 'house' && c.attachedColor === color).length * 3;
-  rent += player.properties.filter((c: any) => c.actionType === 'hotel' && c.attachedColor === color).length * 4;
-  rent += player.properties.filter((c: any) => c.actionType === 'shack' && c.attachedColor === color).length * 5;
-  return rent;
-}
-
-function hasWon(player: any) {
-  let sets = 0;
-  for (const color of ALL_COLORS) {
-    if (isSetComplete(player, color)) sets++;
-  }
-  return sets >= 3;
-}
-
-function removeFromHand(player: any, cardId: string) {
-  const idx = player.hand.findIndex((c: any) => c.id === cardId);
-  if (idx === -1) return null;
-  return player.hand.splice(idx, 1)[0];
-}
-
-function shuffleDeck(deck: any[]) {
-  const arr = [...deck];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function drawCard(state: any) {
-  if (state.deck.length === 0) {
-    if (state.discardPile.length === 0) return null;
-    state.deck = shuffleDeck(state.discardPile);
-    state.discardPile = [];
-  }
-  return state.deck.pop();
-}
-
-function drawCards(state: any, playerId: string, count: number) {
-  const player = getPlayer(state, playerId);
-  const drawn = [];
-  for (let i = 0; i < count; i++) {
-    const card = drawCard(state);
-    if (card) { player.hand.push(card); drawn.push(card); }
-  }
-  return drawn;
-}
+import {
+  corsHeaders, ok, fail, ALL_COLORS,
+  getPlayer, countColor, isSetComplete, isInCompletedSet, rentAmount,
+  hasWon, removeFromHand, drawCards, playerView,
+  createServiceClient, authPlayer, loadGameState, saveGameState, recordMove,
+} from "../_shared/engine.ts";
 
 // ── Main handler ───────────────────────────────────────────────────────
 
@@ -111,58 +17,27 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceClient();
 
     const body = await req.json();
     const { gameId, action, cardId, targetColor, targetId, targetCardId,
             myCardId, doubleCardId, chosenColor, cardType } = body;
 
-    // Auth
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Auth required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const playerId = user.id;
+    const playerId = await authPlayer(supabase, req);
+    if (!playerId) return fail("Auth required", 401);
 
-    // Fetch game
-    const { data: game } = await supabase
-      .from("games")
-      .select("*")
-      .eq("id", gameId)
-      .single();
-
-    if (!game) {
-      return new Response(JSON.stringify({ error: "Game not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const state = game.game_state_json;
+    const loaded = await loadGameState(supabase, gameId);
+    if (!loaded) return fail("Game not found", 404);
+    const { state, version } = loaded;
 
     if (state.phase === 'finished') {
-      return new Response(JSON.stringify({ error: "Game is finished" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return fail("Game is finished");
     }
 
     // ── Draw phase ──
     if (action === 'draw') {
-      if (state.currentPlayer !== playerId) {
-        return new Response(JSON.stringify({ error: "Not your turn" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      if (state.phase !== 'draw') {
-        return new Response(JSON.stringify({ error: "Not in draw phase" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (state.currentPlayer !== playerId) return fail("Not your turn");
+      if (state.phase !== 'draw') return fail("Not in draw phase");
 
       const player = getPlayer(state, playerId);
       const drawCount = player.hand.length === 0 ? 5 : 2;
@@ -172,13 +47,11 @@ serve(async (req) => {
       state.turnDrawn = true;
       state.log.push({ type: 'draw', player: playerId, count: drawn.length });
 
-      // Save and return drawn cards
-      await saveState(supabase, gameId, state);
-      // Record move
-      await supabase.from("moves").insert({
-        game_id: gameId, player_id: playerId,
-        move_type: 'draw', move_data: { count: drawn.length },
-      });
+      // Save state and record move in parallel, then return drawn cards
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'draw', { count: drawn.length }),
+      ]);
 
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
@@ -219,8 +92,10 @@ serve(async (req) => {
       state.log.push({ type: 'play_property', player: playerId, card: removed.name, color: removed.currentColor || removed.color });
 
       checkWin(state, playerId);
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_property', { cardId, chosenColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'play_property', { cardId, chosenColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -236,8 +111,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'bank', player: playerId, card: removed.name, value: removed.value });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'bank', { cardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'bank', { cardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -251,8 +128,10 @@ serve(async (req) => {
       const drawn = drawCards(state, playerId, 2);
       state.log.push({ type: 'pass_go', player: playerId, drawn: drawn.length });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'pass_go', { cardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'pass_go', { cardId }),
+      ]);
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
 
@@ -309,8 +188,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rent, doubled: !!doubleCardId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'rent', { cardId, targetColor, doubleCardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'rent', { cardId, targetColor, doubleCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -333,8 +214,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'debt_collector', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'debt_collector', { cardId, targetId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'debt_collector', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -356,8 +239,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'birthday', player: playerId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'birthday', { cardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'birthday', { cardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -383,8 +268,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'sly_deal', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'sly_deal', { cardId, targetId, targetCardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'sly_deal', { cardId, targetId, targetCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -413,8 +300,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'forced_deal', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'forced_deal', { cardId, targetId, targetCardId, myCardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'forced_deal', { cardId, targetId, targetCardId, myCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -438,8 +327,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'deal_breaker', player: playerId, target: targetId, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'deal_breaker', { cardId, targetId, targetColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'deal_breaker', { cardId, targetId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -462,8 +353,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'play_house_hotel', player: playerId, card: removed.name, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_house_hotel', { cardId, targetColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'play_house_hotel', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -480,7 +373,7 @@ serve(async (req) => {
       card.currentColor = chosenColor;
       state.log.push({ type: 'move_wild', player: playerId, card: card.name, color: chosenColor });
 
-      await saveState(supabase, gameId, state);
+      await saveGameState(supabase, gameId, state, version);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -497,8 +390,10 @@ serve(async (req) => {
       state.turnPlaysRemaining--;
       state.log.push({ type: 'play_shack', player: playerId, color: targetColor });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'play_shack', { cardId, targetColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'play_shack', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -513,8 +408,10 @@ serve(async (req) => {
       const drawn = drawCards(state, playerId, drawCount);
       state.log.push({ type: 'nm_pass_go', player: playerId, drawn: drawn.length });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'nm_pass_go', { cardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'nm_pass_go', { cardId }),
+      ]);
       return ok({ drawnCards: drawn, state: playerView(state, playerId) });
     }
 
@@ -556,8 +453,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'nm_rent', player: playerId, color: targetColor, amount: rent, doubled: !!doubleCardId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'nm_rent', { cardId, targetColor, doubleCardId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'nm_rent', { cardId, targetColor, doubleCardId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -587,8 +486,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'rent', player: playerId, color: targetColor, amount: rent, doubled: true });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'double_rent_alone', { cardId, targetColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'double_rent_alone', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -617,8 +518,10 @@ serve(async (req) => {
         state.phase = 'play';
       }
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'super_sly_deal', { cardId, targetColor });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'super_sly_deal', { cardId, targetColor }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -642,8 +545,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'repossession', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'repossession', { cardId, targetId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'repossession', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -667,8 +572,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'tough_luck', player: playerId, target: targetId, cardType });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'tough_luck', { cardId, targetId, cardType });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'tough_luck', { cardId, targetId, cardType }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -692,8 +599,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'yoink', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'yoink', { cardId, targetId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'yoink', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -717,8 +626,10 @@ serve(async (req) => {
       state.phase = 'respond';
       state.log.push({ type: 'unfair_trade', player: playerId, target: targetId });
 
-      await saveState(supabase, gameId, state);
-      await recordMove(supabase, gameId, playerId, 'unfair_trade', { cardId, targetId });
+      await Promise.all([
+        saveGameState(supabase, gameId, state, version),
+        recordMove(supabase, gameId, playerId, 'unfair_trade', { cardId, targetId }),
+      ]);
       return ok({ state: playerView(state, playerId) });
     }
 
@@ -743,46 +654,7 @@ function checkWin(state: any, playerId: string) {
   }
 }
 
-function playerView(state: any, playerId: string) {
-  return {
-    ...state,
-    deck: state.deck.length,
-    players: state.players.map((p: any) => ({
-      ...p,
-      hand: p.id === playerId ? p.hand : p.hand.map(() => ({ id: 'hidden', type: 'hidden' })),
-    })),
-  };
-}
 
-async function saveState(supabase: any, gameId: string, state: any) {
-  await supabase
-    .from("games")
-    .update({
-      game_state_json: state,
-      current_player: state.currentPlayer,
-    })
-    .eq("id", gameId);
-}
 
-async function recordMove(supabase: any, gameId: string, playerId: string, moveType: string, moveData: any) {
-  await supabase.from("moves").insert({
-    game_id: gameId,
-    player_id: playerId,
-    move_type: moveType,
-    move_data: moveData,
-  });
-}
 
-function ok(data: any) {
-  return new Response(
-    JSON.stringify(data),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
 
-function fail(reason: string) {
-  return new Response(
-    JSON.stringify({ error: reason }),
-    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
