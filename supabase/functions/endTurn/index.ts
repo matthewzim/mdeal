@@ -2,55 +2,11 @@
 // Handles ending a turn (including discard phase)
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const ALL_COLORS = ['brown','darkblue','lightblue','pink','orange','red','yellow','green','railroad','utility'];
-const SET_REQUIREMENTS: Record<string, number> = {
-  brown: 2, darkblue: 2, lightblue: 3, pink: 3, orange: 3,
-  red: 3, yellow: 3, green: 3, railroad: 4, utility: 2,
-};
-
-function getPlayer(state: any, id: string) {
-  return state.players.find((p: any) => p.id === id);
-}
-
-function countColor(player: any, color: string) {
-  let c = 0;
-  for (const card of player.properties) {
-    if (card.type === 'property' && card.color === color) c++;
-    if (card.type === 'wild_property' && card.currentColor === color) c++;
-  }
-  return c;
-}
-
-function isSetComplete(player: any, color: string) {
-  return countColor(player, color) >= (SET_REQUIREMENTS[color] || 999);
-}
-
-function hasWon(player: any) {
-  let sets = 0;
-  for (const color of ALL_COLORS) {
-    if (isSetComplete(player, color)) sets++;
-  }
-  return sets >= 3;
-}
-
-function playerView(state: any, playerId: string) {
-  return {
-    ...state,
-    deck: state.deck.length,
-    players: state.players.map((p: any) => ({
-      ...p,
-      hand: p.id === playerId ? p.hand : p.hand.map(() => ({ id: 'hidden', type: 'hidden' })),
-    })),
-  };
-}
+import {
+  corsHeaders, ok, fail,
+  getPlayer, hasWon, playerView,
+  createServiceClient, authPlayer, loadGameState, saveGameState,
+} from "../_shared/engine.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -58,40 +14,20 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceClient();
 
     const body = await req.json();
     const { gameId, discardCardIds } = body;
 
-    // Auth
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Auth required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const playerId = user.id;
+    const playerId = await authPlayer(supabase, req);
+    if (!playerId) return fail("Auth required", 401);
 
-    // Fetch game
-    const { data: game } = await supabase
-      .from("games").select("*").eq("id", gameId).single();
-    if (!game) {
-      return new Response(JSON.stringify({ error: "Game not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const loaded = await loadGameState(supabase, gameId);
+    if (!loaded) return fail("Game not found", 404);
+    const { state, version, roomId } = loaded;
 
-    const state = game.game_state_json;
     if (state.currentPlayer !== playerId) {
-      return new Response(JSON.stringify({ error: "Not your turn" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return fail("Not your turn");
     }
 
     const player = getPlayer(state, playerId);
@@ -102,24 +38,19 @@ serve(async (req) => {
         const excess = player.hand.length - 7;
         if (excess > 0) {
           state.phase = 'discard';
-          await saveState(supabase, gameId, state);
-          return new Response(
-            JSON.stringify({ needsDiscard: true, excess, state: playerView(state, playerId) }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          await saveGameState(supabase, gameId, state, version);
+          return ok({ needsDiscard: true, excess, state: playerView(state, playerId) });
         }
       } else {
         // Validate discards
         for (const id of discardCardIds) {
           if (!player.hand.find((c: any) => c.id === id)) {
-            return new Response(JSON.stringify({ error: "Card not in hand: " + id }),
-              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return fail("Card not in hand: " + id);
           }
         }
         const afterCount = player.hand.length - discardCardIds.length;
         if (afterCount > 7) {
-          return new Response(JSON.stringify({ error: "Must discard to 7 cards" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return fail("Must discard to 7 cards");
         }
 
         // Do discard
@@ -135,18 +66,14 @@ serve(async (req) => {
     }
 
     if (state.pendingAction) {
-      return new Response(JSON.stringify({ error: "Must resolve pending action first" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return fail("Must resolve pending action first");
     }
 
     // Check hand limit again
     if (player.hand.length > 7) {
       state.phase = 'discard';
-      await saveState(supabase, gameId, state);
-      return new Response(
-        JSON.stringify({ needsDiscard: true, excess: player.hand.length - 7, state: playerView(state, playerId) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      await saveGameState(supabase, gameId, state, version);
+      return ok({ needsDiscard: true, excess: player.hand.length - 7, state: playerView(state, playerId) });
     }
 
     // Check win
@@ -154,15 +81,12 @@ serve(async (req) => {
       state.phase = 'finished';
       state.winner = playerId;
       state.log.push({ type: 'win', player: playerId });
-      await saveState(supabase, gameId, state);
+      await saveGameState(supabase, gameId, state, version);
 
       // Update room
-      await supabase.from("rooms").update({ status: "finished" }).eq("id", game.room_id);
+      await supabase.from("rooms").update({ status: "finished" }).eq("id", roomId);
 
-      return new Response(
-        JSON.stringify({ winner: playerId, state: playerView(state, playerId) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return ok({ winner: playerId, state: playerView(state, playerId) });
     }
 
     // Advance turn
@@ -175,17 +99,14 @@ serve(async (req) => {
     state.log.push({ type: 'end_turn', player: playerId });
 
     await Promise.all([
-      saveState(supabase, gameId, state),
+      saveGameState(supabase, gameId, state, version),
       supabase.from("moves").insert({
         game_id: gameId, player_id: playerId,
         move_type: 'end_turn', move_data: {},
       }),
     ]);
 
-    return new Response(
-      JSON.stringify({ state: playerView(state, playerId) }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return ok({ state: playerView(state, playerId) });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: err.message }),
@@ -194,9 +115,3 @@ serve(async (req) => {
   }
 });
 
-async function saveState(supabase: any, gameId: string, state: any) {
-  await supabase.from("games").update({
-    game_state_json: state,
-    current_player: state.currentPlayer,
-  }).eq("id", gameId);
-}

@@ -1,5 +1,10 @@
 // Monopoly Deal - Game Engine
 // Mutates game state based on validated actions
+//
+// NOTE: This is the browser copy of the rules, used for local (vs computer)
+// games and for client-side prediction in online games. The server-side
+// source of truth lives in supabase/functions/_shared/engine.ts (helpers)
+// and the individual edge functions — keep rule changes in sync.
 
 // Wrap in IIFE to avoid redeclaring const variables from deck.js in the
 // global scope (which would cause a SyntaxError in the browser).

@@ -22,6 +22,11 @@ const SupabaseClient = (() => {
 
   // ── Auth ──────────────────────────────────────────────────────────────
 
+  function generatePassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   async function signInAnonymously() {
     // Try anonymous sign-in first
     const { data, error } = await supabase.auth.signInAnonymously();
@@ -33,9 +38,11 @@ const SupabaseClient = (() => {
     // If anonymous sign-ins are disabled, fall back to auto-generated account
     const storedId = localStorage.getItem('mdeal_auto_user_id');
     if (storedId) {
-      // Try to sign in with existing auto-generated credentials
+      // Try to sign in with existing auto-generated credentials.
+      // Legacy accounts (before a dedicated password was stored) used the
+      // user id as the password.
       const email = `${storedId}@mdeal.local`;
-      const password = storedId;
+      const password = localStorage.getItem('mdeal_auto_user_pw') || storedId;
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (!signInError) {
         currentUser = signInData.user;
@@ -43,13 +50,14 @@ const SupabaseClient = (() => {
       }
     }
 
-    // Create a new auto-generated account
+    // Create a new auto-generated account with a strong random password
     const userId = crypto.randomUUID();
     const email = `${userId}@mdeal.local`;
-    const password = userId;
+    const password = generatePassword();
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
     if (signUpError) throw signUpError;
     localStorage.setItem('mdeal_auto_user_id', userId);
+    localStorage.setItem('mdeal_auto_user_pw', password);
     currentUser = signUpData.user;
     return signUpData;
   }
@@ -191,6 +199,12 @@ const SupabaseClient = (() => {
 
   async function respondAction(gameId, response, params = {}) {
     return callFunction('respondAction', { gameId, response, ...params });
+  }
+
+  // Fetch the caller's redacted view of a game (the only way to get your
+  // own hand — the games table stores a fully hidden public view).
+  async function getState(gameId) {
+    return callFunction('getState', { gameId });
   }
 
   // ── Ready status ─────────────────────────────────────────────────────
@@ -387,7 +401,7 @@ const SupabaseClient = (() => {
 
   return {
     init, getClient, signInAnonymously, getSession, getUser, getToken,
-    createRoom, joinRoom, startGame, playCard, endTurn, respondAction,
+    createRoom, joinRoom, startGame, playCard, endTurn, respondAction, getState,
     setReady, getRoomByCode, getRoomPlayers, getGame, getPlayerName,
     getPublicRooms, getOnlinePlayerCount,
     subscribeToRoom, subscribeToGame, unsubscribeAll,

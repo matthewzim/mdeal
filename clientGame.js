@@ -37,10 +37,13 @@ const ClientGame = (() => {
     return isFullState(state) ? GameEngine.getPlayerView(state, playerId) : state;
   }
 
-  // Monotonic sequence for staleness checks: every action appends to the
-  // game log, so a state with a shorter log is older.
+  // Monotonic sequence for staleness checks. The server bumps state.seq on
+  // every save; fall back to log length for states that predate it (the
+  // log is trimmed server-side, so seq is the reliable signal).
   function stateSeq(state) {
-    return (state && state.log && state.log.length) || 0;
+    if (!state) return 0;
+    if (typeof state.seq === 'number') return state.seq;
+    return (state.log && state.log.length) || 0;
   }
 
   // Accept an incoming authoritative state unless it is older than what we
@@ -59,23 +62,25 @@ const ClientGame = (() => {
    * then sync with the server. On server error, rollback to pre-action state.
    *
    * Prediction runs on both full states and server views — the engine
-   * mutators only need the deck for actions that draw cards, which callers
-   * mark with opts.requiresDeck.
+   * mutators only need the deck for actions that draw cards, and those
+   * callers provide predictors that handle view states themselves.
    *
    * @param {Function} predictFn - (state) => void, mutates state via GameEngine
    * @param {Function} serverCallFn - async () => result from server
    * @param {Object} [renderOptions] - options passed to UI.renderGame
-   * @param {Object} [opts] - { requiresDeck: true } for actions that draw
    * @returns {Object|null} server result, or null on error
    */
-  async function withOptimisticUpdate(predictFn, serverCallFn, renderOptions, opts) {
+  async function withOptimisticUpdate(predictFn, serverCallFn, renderOptions) {
     const snapshot = deepClone(gameState);
     let predicted = false;
 
     // Apply prediction locally for instant visual feedback
     try {
-      if (gameState && (!opts?.requiresDeck || isFullState(gameState))) {
+      if (gameState) {
         predictFn(gameState);
+        // Mirror the server's per-save seq bump so events for older moves
+        // are recognized as stale while this prediction is in flight.
+        if (typeof gameState.seq === 'number') gameState.seq++;
         UI.renderGame(toView(gameState), playerId, playerNames, renderOptions);
         predicted = true;
       }
@@ -280,10 +285,16 @@ const ClientGame = (() => {
     const game = await SupabaseClient.getGame(roomId);
     if (!game) return;
     gameId = game.id;
-    gameState = game.game_state_json;
 
-    // Build player names map
-    const players = await SupabaseClient.getRoomPlayers(roomId);
+    // The games row holds only the public view (all hands hidden); fetch
+    // our personal view (own hand visible) from the server in parallel
+    // with the player names.
+    const [viewResult, players] = await Promise.all([
+      SupabaseClient.getState(gameId).catch(() => null),
+      SupabaseClient.getRoomPlayers(roomId),
+    ]);
+    gameState = viewResult?.state || game.game_state_json;
+
     for (const p of players) {
       playerNames[p.player_id] = p.players?.username || 'Unknown';
     }
@@ -294,11 +305,21 @@ const ClientGame = (() => {
     UI.renderGame(toView(gameState), playerId, playerNames);
   }
 
+  // Chat messages arrive over a broadcast channel anyone in the room can
+  // publish to — clamp fields to sane shapes/lengths before storing them.
+  function sanitizeChatMessage(msg) {
+    return {
+      author: String(msg?.author || 'Unknown').slice(0, 20),
+      text: String(msg?.text || '').slice(0, 200),
+      time: typeof msg?.time === 'number' ? msg.time : Date.now(),
+    };
+  }
+
   function subscribeToChatUpdates() {
     if (chatSubscription) return;
     chatMessages = [];
     chatSubscription = SupabaseClient.subscribeToChatChannel(roomId, (msg) => {
-      chatMessages.push(msg);
+      chatMessages.push(sanitizeChatMessage(msg));
       if (chatMessages.length > 100) chatMessages.shift();
       UI.renderChatMessages(chatMessages);
     });
@@ -309,7 +330,7 @@ const ClientGame = (() => {
     const msg = {
       author: username,
       playerId: playerId,
-      text: text,
+      text: String(text).slice(0, 200),
       time: Date.now(),
     };
     chatMessages.push(msg);
@@ -320,20 +341,40 @@ const ClientGame = (() => {
     UI.renderChatMessages(chatMessages);
   }
 
+  // Realtime events carry the public view, where every hand — including
+  // ours — is hidden. Restore our own hand from local state when the card
+  // count matches; a mismatch means we are out of sync (e.g. an opponent's
+  // Tough Luck stole from our hand) and must refetch our personal view.
+  function mergeOwnHand(incoming) {
+    if (!incoming || !incoming.players) return incoming;
+    const incomingMe = incoming.players.find(p => p.id === playerId);
+    const localMe = gameState?.players?.find(p => p.id === playerId);
+    if (!incomingMe || !localMe || !Array.isArray(localMe.hand)) return incoming;
+    const localHand = localMe.hand.filter(c => c.type !== 'hidden');
+    const incomingCount = Array.isArray(incomingMe.hand) ? incomingMe.hand.length : 0;
+    if (localHand.length !== incomingCount) return null; // out of sync
+    incomingMe.hand = localHand;
+    return incoming;
+  }
+
   function subscribeToGameUpdates() {
     if (gameSubscription) return;
     gameSubscription = SupabaseClient.subscribeToGame(gameId, async (payload) => {
-      if (!payload.new) return;
-      // The realtime payload carries the updated row, so use it directly
-      // instead of refetching (saves a round trip per move).
-      if (payload.new.game_state_json) {
-        applyServerState(payload.new.game_state_json);
+      const incoming = payload.new?.game_state_json;
+      if (!incoming) return;
+      // Ignore events older than what we already show (e.g. the echo of a
+      // move we have already predicted past).
+      if (gameState && stateSeq(incoming) < stateSeq(gameState)) return;
+
+      const merged = mergeOwnHand(incoming);
+      if (merged) {
+        applyServerState(merged);
         return;
       }
-      // Fallback: refetch if the payload was truncated/missing the state
-      const game = await SupabaseClient.getGame(roomId);
-      if (game) {
-        applyServerState(game.game_state_json);
+      // Hand count changed without our involvement — fetch our view
+      const result = await SupabaseClient.getState(gameId).catch(() => null);
+      if (result?.state) {
+        applyServerState(result.state);
       }
     });
   }
@@ -342,10 +383,23 @@ const ClientGame = (() => {
 
   async function drawCards() {
     const result = await withOptimisticUpdate(
-      (state) => GameEngine.startTurn(state),
+      (state) => {
+        if (isFullState(state)) {
+          GameEngine.startTurn(state);
+          return;
+        }
+        // View state (no deck contents): predict the phase transition for
+        // instant feedback; the actual cards arrive with the server response.
+        const me = state.players.find(p => p.id === playerId);
+        const count = me && me.hand.length === 0 ? 5 : 2;
+        if (typeof state.deck === 'number') state.deck = Math.max(0, state.deck - count);
+        state.turnPlaysRemaining = 3;
+        state.phase = 'play';
+        state.turnDrawn = true;
+        state.log.push({ type: 'draw', player: playerId, count });
+      },
       () => SupabaseClient.playCard(gameId, 'draw'),
-      { animateHand: true },
-      { requiresDeck: true }
+      { animateHand: true }
     );
     if (result && result.drawnCards) {
       UI.showDrawnCards(result.drawnCards);
@@ -373,12 +427,32 @@ const ClientGame = (() => {
     );
   }
 
+  // Predict a "discard this card, then draw" action on a view state where
+  // the deck contents are unknown: the card leaves the hand immediately and
+  // the drawn cards arrive with the server response.
+  function predictDiscardAndDraw(state, cardId, logType, drawCountFn) {
+    const me = state.players.find(p => p.id === playerId);
+    if (!me) throw new Error('Player not found');
+    if (state.turnPlaysRemaining <= 0) throw new Error('No plays remaining');
+    const idx = me.hand.findIndex(c => c.id === cardId);
+    if (idx === -1) throw new Error('Card not in hand');
+    state.discardPile.push(me.hand.splice(idx, 1)[0]);
+    state.turnPlaysRemaining--;
+    const drawn = drawCountFn(me);
+    if (typeof state.deck === 'number') state.deck = Math.max(0, state.deck - drawn);
+    state.log.push({ type: logType, player: playerId, drawn });
+  }
+
   async function playPassGo(cardId) {
     const result = await withOptimisticUpdate(
-      (state) => GameEngine.playPassGo(state, playerId, cardId),
-      () => SupabaseClient.playCard(gameId, 'pass_go', { cardId }),
-      undefined,
-      { requiresDeck: true }
+      (state) => {
+        if (isFullState(state)) {
+          GameEngine.playPassGo(state, playerId, cardId);
+          return;
+        }
+        predictDiscardAndDraw(state, cardId, 'pass_go', () => 2);
+      },
+      () => SupabaseClient.playCard(gameId, 'pass_go', { cardId })
     );
     if (result && result.drawnCards) {
       UI.showDrawnCards(result.drawnCards);
@@ -844,10 +918,15 @@ const ClientGame = (() => {
       localPlayNmPassGo(cardId);
     } else {
       await withOptimisticUpdate(
-        (state) => GameEngine.playNmPassGo(state, playerId, cardId),
-        () => SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId }),
-        undefined,
-        { requiresDeck: true }
+        (state) => {
+          if (isFullState(state)) {
+            GameEngine.playNmPassGo(state, playerId, cardId);
+            return;
+          }
+          predictDiscardAndDraw(state, cardId, 'nm_pass_go',
+            (me) => Math.max(0, 7 - me.hand.length));
+        },
+        () => SupabaseClient.playCard(gameId, 'nm_pass_go', { cardId })
       );
     }
   }
@@ -1005,10 +1084,15 @@ const ClientGame = (() => {
       username = session.username;
       isHost = session.isHost;
       roomIsPublic = session.roomIsPublic || false;
-      gameState = game.game_state_json;
 
-      // Build player names map
-      const players = await SupabaseClient.getRoomPlayers(roomId);
+      // The games row holds the public view; fetch our personal view
+      // (with our hand) alongside the player names.
+      const [viewResult, players] = await Promise.all([
+        SupabaseClient.getState(gameId).catch(() => null),
+        SupabaseClient.getRoomPlayers(roomId),
+      ]);
+      gameState = viewResult?.state || game.game_state_json;
+
       for (const p of players) {
         playerNames[p.player_id] = p.players?.username || 'Unknown';
       }

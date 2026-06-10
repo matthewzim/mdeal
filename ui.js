@@ -26,7 +26,6 @@ const UI = (() => {
   let discardMode = false;
   let discardNeeded = 0;
   let selectedDiscards = [];
-  let actionTargetMode = null; // for targeting actions
   let lastRenderedHandIds = null; // track hand card IDs to avoid unnecessary re-renders
   // Per-zone render signatures: skip innerHTML rebuilds (and the resulting
   // image flicker / listener churn) when a zone's data hasn't changed.
@@ -151,7 +150,9 @@ const UI = (() => {
           if (player) {
             const excess = player.hand.length - 7;
             if (excess > 0) {
-              const discardIds = player.hand.slice(0, excess).map(c => c.id);
+              // Auto-discard the lowest-value cards
+              const sorted = [...player.hand].sort((a, b) => (a.value || 0) - (b.value || 0));
+              const discardIds = sorted.slice(0, excess).map(c => c.id);
               await ClientGame.endTurn(discardIds);
               return;
             }
@@ -658,7 +659,7 @@ const UI = (() => {
     }
 
     const isMyTurn = state && state.currentPlayer === myId;
-    const sig = isMyTurn + '|' + (actionTargetMode || '') + '|' + JSON.stringify(
+    const sig = isMyTurn + '|' + JSON.stringify(
       player.properties.map(c => [c.id, c.currentColor || c.color, c.attachedColor])
     );
     if (zoneUnchanged('myProps', sig)) return;
@@ -701,17 +702,8 @@ const UI = (() => {
         el.style.left = '0';
         el.style.zIndex = stackIndex;
 
-        // Allow selecting for payment or forced deal
-        if (actionTargetMode === 'select_my_property') {
-          el.classList.add('selectable');
-          el.addEventListener('click', () => {
-            if (typeof actionTargetMode._callback === 'function') {
-              actionTargetMode._callback(card.id);
-            }
-          });
-        }
         // Wild cards are switchable on player's turn
-        else if (isMyTurn && card.type === 'wild_property') {
+        if (isMyTurn && card.type === 'wild_property') {
           el.classList.add('switchable');
           el.addEventListener('click', () => showWildColorSwitch(card));
         }
@@ -726,15 +718,6 @@ const UI = (() => {
         el.style.top = (stackIndex * stackOffset) + 'px';
         el.style.left = '0';
         el.style.zIndex = stackIndex;
-
-        if (actionTargetMode === 'select_my_property') {
-          el.classList.add('selectable');
-          el.addEventListener('click', () => {
-            if (typeof actionTargetMode._callback === 'function') {
-              actionTargetMode._callback(card.id);
-            }
-          });
-        }
         cardsRow.appendChild(el);
         stackIndex++;
       }
@@ -1477,7 +1460,6 @@ const UI = (() => {
 
   function _closeOverlay() {
     document.getElementById('action-overlay').style.display = 'none';
-    actionTargetMode = null;
     // The overlay is gone, so force the next pending-action render to rebuild
     // (it may need to re-show a respond/pay UI after a failed prediction).
     renderSig.pendingAction = null;
@@ -2129,7 +2111,9 @@ const UI = (() => {
 
   function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function createButton(text, className, onClick) {
@@ -2266,7 +2250,10 @@ const UI = (() => {
     try {
       const raw = localStorage.getItem(GLOBAL_CHAT_STORAGE_KEY);
       if (raw) {
-        globalChatMessages = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        globalChatMessages = Array.isArray(parsed)
+          ? parsed.slice(-100).map(sanitizeGlobalChatMessage)
+          : [];
       }
     } catch (e) {
       globalChatMessages = [];
@@ -2281,12 +2268,22 @@ const UI = (() => {
     }
   }
 
+  // Global chat is an open broadcast channel — clamp incoming fields to
+  // sane shapes/lengths before storing or rendering them.
+  function sanitizeGlobalChatMessage(msg) {
+    return {
+      author: String(msg?.author || 'Unknown').slice(0, 20),
+      text: String(msg?.text || '').slice(0, 200),
+      time: typeof msg?.time === 'number' ? msg.time : Date.now(),
+    };
+  }
+
   function initGlobalChat() {
     loadGlobalChatMessages();
     renderGlobalChatMessages();
 
     SupabaseClient.subscribeToGlobalChat((msg) => {
-      globalChatMessages.push(msg);
+      globalChatMessages.push(sanitizeGlobalChatMessage(msg));
       if (globalChatMessages.length > 100) globalChatMessages.shift();
       saveGlobalChatMessages();
       renderGlobalChatMessages();
@@ -2342,11 +2339,7 @@ const UI = (() => {
     const text = msgInput.value.trim();
     if (!text) return;
 
-    const msg = {
-      author: name,
-      text: text,
-      time: Date.now(),
-    };
+    const msg = sanitizeGlobalChatMessage({ author: name, text });
 
     globalChatMessages.push(msg);
     if (globalChatMessages.length > 100) globalChatMessages.shift();
